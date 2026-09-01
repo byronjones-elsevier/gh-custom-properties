@@ -205,6 +205,7 @@ func (m *batchModel) handleChunk(msg batchChunkMsg) (tea.Model, tea.Cmd) {
 	}
 	for org, defs := range msg.schemas {
 		if _, ok := m.schemaByOrg[org]; !ok {
+			sortSchema(defs)
 			m.schemaByOrg[org] = defs
 		}
 	}

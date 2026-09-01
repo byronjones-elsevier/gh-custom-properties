@@ -87,6 +87,27 @@ func TestBatchModel_HeaderNotesMixedOrgs(t *testing.T) {
 	}
 }
 
+func TestBatchModel_SchemaSortedAlphabetically(t *testing.T) {
+	api := &fakeAPI{}
+	rows := []repoRow{{owner: "acme", repo: "a"}}
+	schema := map[string][]ghclient.PropertyDefinition{
+		"acme": {
+			{Name: "Zebra", Type: ghclient.PropertyTypeString},
+			{Name: "Apple", Type: ghclient.PropertyTypeSingleSelect, AllowedValues: []string{"Charlie", "Alpha", "Bravo"}},
+			{Name: "Mango", Type: ghclient.PropertyTypeString},
+		},
+	}
+	m := newTableModel(t, api, rows, schema)
+
+	got := m.schemaByOrg["acme"]
+	if got[0].Name != "Apple" || got[1].Name != "Mango" || got[2].Name != "Zebra" {
+		t.Fatalf("schemaByOrg[acme] names = %v, want alphabetical order", []string{got[0].Name, got[1].Name, got[2].Name})
+	}
+	if av := got[0].AllowedValues; av[0] != "Alpha" || av[1] != "Bravo" || av[2] != "Charlie" {
+		t.Errorf("Apple.AllowedValues = %v, want alphabetical order", av)
+	}
+}
+
 func TestBatchModel_BulkSetAcrossRepos(t *testing.T) {
 	api := &fakeAPI{}
 	rows := []repoRow{

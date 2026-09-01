@@ -61,6 +61,12 @@ express: format validation for the `string`-typed properties (email, date,
 alphanumeric). Adding a new Elsevier standard `single_select` property
 needs no code change here — it just needs to exist in the org's schema.
 
+GitHub doesn't guarantee an order for either the property list or a
+`single_select`/`multi_select` property's `allowed_values` — `internal/tui/schema.go`'s
+`sortSchema` sorts both alphabetically (by property name, and each
+property's allowed values) right after a fetch, so the name picker and
+value dropdowns are always predictable regardless of API response order.
+
 `ghclient.PropertiesAPI` is the interface the TUI depends on instead of the
 concrete `*Client`; tests use a hand-rolled fake (`internal/tui/fake_api_test.go`)
 rather than hitting the network. `Client` itself is tested against

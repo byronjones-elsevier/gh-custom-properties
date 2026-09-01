@@ -297,6 +297,7 @@ func (m *singleRepoModel) handleLoaded(msg loadedMsg) (tea.Model, tea.Cmd) {
 	sort.Slice(m.properties, func(i, j int) bool { return m.properties[i].Name < m.properties[j].Name })
 
 	if msg.schemaErr == nil {
+		sortSchema(msg.schema)
 		m.schema = msg.schema
 		m.schemaByName = make(map[string]ghclient.PropertyDefinition, len(msg.schema))
 		for _, d := range msg.schema {

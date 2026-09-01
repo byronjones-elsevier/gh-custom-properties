@@ -196,6 +196,29 @@ func TestSingleRepoModel_EditRejectsInvalidKnownFormat(t *testing.T) {
 	}
 }
 
+func TestSingleRepoModel_SchemaSortedAlphabetically(t *testing.T) {
+	schema := []ghclient.PropertyDefinition{
+		{Name: "Zebra", Type: ghclient.PropertyTypeString},
+		{Name: "Apple", Type: ghclient.PropertyTypeSingleSelect, AllowedValues: []string{"Charlie", "Alpha", "Bravo"}},
+		{Name: "Mango", Type: ghclient.PropertyTypeString},
+	}
+	m := newLoadedModel(t, nil, schema, nil)
+
+	if got := []string{m.schema[0].Name, m.schema[1].Name, m.schema[2].Name}; got[0] != "Apple" || got[1] != "Mango" || got[2] != "Zebra" {
+		t.Fatalf("m.schema names = %v, want alphabetical order", got)
+	}
+	if got := m.schema[0].AllowedValues; got[0] != "Alpha" || got[1] != "Bravo" || got[2] != "Charlie" {
+		t.Errorf("Apple.AllowedValues = %v, want alphabetical order", got)
+	}
+
+	// The add-property name picker should list candidates in that same order.
+	next, _ := m.Update(runeKey('a'))
+	m = next.(*singleRepoModel)
+	if got := m.editor.namePicker.options; got[0] != "Apple" || got[1] != "Mango" || got[2] != "Zebra" {
+		t.Errorf("add-editor namePicker.options = %v, want alphabetical order", got)
+	}
+}
+
 func TestSingleRepoModel_AddWithSchema(t *testing.T) {
 	schema := []ghclient.PropertyDefinition{
 		{Name: "tier", Type: ghclient.PropertyTypeSingleSelect, AllowedValues: []string{"1", "2", "3"}},

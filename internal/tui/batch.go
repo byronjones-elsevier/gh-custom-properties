@@ -99,8 +99,7 @@ type batchModel struct {
 
 	width, height int // last known terminal size, from tea.WindowSizeMsg
 
-	err      error
-	quitting bool
+	err error
 }
 
 func newBatchModel(api ghclient.PropertiesAPI, backupDir string, entries []repolist.Entry, skipped []repolist.Skipped) *batchModel {
@@ -221,9 +220,8 @@ func (m *batchModel) handleChunk(msg batchChunkMsg) (tea.Model, tea.Cmd) {
 func (m *batchModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.screen {
 	case bScreenLoading:
-		if msg.Type == tea.KeyCtrlC || msg.String() == "q" {
-			m.quitting = true
-			return m, tea.Quit
+		if msg.String() == "q" {
+			return m, quitRequestedCmd
 		}
 	case bScreenTable:
 		return m.handleTableKey(msg)
@@ -233,11 +231,6 @@ func (m *batchModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleChoosePropertyKey(msg)
 	case bScreenChooseTargets:
 		return m.handleChooseTargetsKey(msg)
-	case bScreenApplying:
-		if msg.Type == tea.KeyCtrlC {
-			m.quitting = true
-			return m, tea.Quit
-		}
 	case bScreenResult:
 		m.screen = bScreenTable
 	}
@@ -246,9 +239,8 @@ func (m *batchModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "q", "ctrl+c":
-		m.quitting = true
-		return m, tea.Quit
+	case "q":
+		return m, quitRequestedCmd
 	case "up", "k":
 		if m.cursor > 0 {
 			m.cursor--
@@ -481,8 +473,6 @@ func upsertOrDeleteProperty(props []ghclient.PropertyValue, name string, value a
 	}
 	return append(props, ghclient.PropertyValue{Name: name, Value: value})
 }
-
-func (m *batchModel) Quitting() bool { return m.quitting }
 
 // header returns the persistent banner shown at the top of every screen:
 // the org the batch is drawn from (or a note that it spans multiple orgs)

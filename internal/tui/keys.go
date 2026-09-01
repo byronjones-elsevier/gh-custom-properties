@@ -24,7 +24,7 @@ func defaultListKeyMap() listKeyMap {
 		Delete: key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete")),
 		Save:   key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "apply changes")),
 		Cancel: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
-		Quit:   key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
+		Quit:   key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
 	}
 }
 

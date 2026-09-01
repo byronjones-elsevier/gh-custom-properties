@@ -70,7 +70,6 @@ type singleRepoModel struct {
 
 	backupPath string
 	err        error
-	quitting   bool
 }
 
 // newSingleRepoModel builds the single-repo model. If ownerRepo is empty the
@@ -184,10 +183,6 @@ func (m *singleRepoModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.screen = screenLoading
 			return m, tea.Batch(m.spin.Tick, m.loadCmd())
 		}
-		if msg.Type == tea.KeyCtrlC || msg.String() == "q" {
-			m.quitting = true
-			return m, tea.Quit
-		}
 		var cmd tea.Cmd
 		m.repoInput, cmd = m.repoInput.Update(msg)
 		return m, cmd
@@ -228,7 +223,9 @@ func (m *singleRepoModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case screenResult:
-		m.quitting = true
+		// A deliberate dismissal after work is already saved (or a failure
+		// already reported) — not an accidental interrupt, so this quits
+		// immediately without the confirm overlay.
 		return m, tea.Quit
 	}
 	return m, nil
@@ -237,8 +234,7 @@ func (m *singleRepoModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Quit):
-		m.quitting = true
-		return m, tea.Quit
+		return m, quitRequestedCmd
 	case key.Matches(msg, m.keys.Up):
 		if m.cursor > 0 {
 			m.cursor--
@@ -455,5 +451,3 @@ func formatValue(v any) string {
 		return fmt.Sprintf("%v", t)
 	}
 }
-
-func (m *singleRepoModel) Quitting() bool { return m.quitting }

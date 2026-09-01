@@ -24,8 +24,8 @@ const (
 
 // RepoSnapshot is the pre-change state of one repo's custom properties.
 type RepoSnapshot struct {
-	Owner            string                  `json:"owner"`
-	Repo             string                  `json:"repo"`
+	Owner            string                   `json:"owner"`
+	Repo             string                   `json:"repo"`
 	PropertiesBefore []ghclient.PropertyValue `json:"properties_before"`
 }
 

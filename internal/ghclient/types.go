@@ -1,6 +1,9 @@
 package ghclient
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // ErrSchemaUnavailable is returned by GetOrgSchema when the token lacks
 // permission to read the org's custom-property schema (403/404). Callers
@@ -34,6 +37,25 @@ type PropertyDefinition struct {
 type PropertyValue struct {
 	Name  string
 	Value any
+}
+
+// normalizeValue converts the result of unmarshaling a property value from
+// JSON (where a multi_select value decodes as []any) into the plain
+// string/[]string/nil shapes the rest of the codebase works with.
+func normalizeValue(v any) any {
+	items, ok := v.([]any)
+	if !ok {
+		return v
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		} else {
+			out = append(out, fmt.Sprintf("%v", item))
+		}
+	}
+	return out
 }
 
 // RepoProperties bundles a repo's identity with its current property values,

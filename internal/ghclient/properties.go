@@ -54,7 +54,7 @@ func (c *Client) GetRepoProperties(ctx context.Context, owner, repo string) ([]P
 
 	values := make([]PropertyValue, len(wire))
 	for i, w := range wire {
-		values[i] = PropertyValue{Name: w.PropertyName, Value: w.Value}
+		values[i] = PropertyValue{Name: w.PropertyName, Value: normalizeValue(w.Value)}
 	}
 	return values, nil
 }
@@ -132,7 +132,7 @@ func (c *Client) GetOrgSchema(ctx context.Context, org string) ([]PropertyDefini
 			Name:          w.PropertyName,
 			Type:          PropertyType(w.ValueType),
 			Required:      w.Required,
-			DefaultValue:  w.DefaultValue,
+			DefaultValue:  normalizeValue(w.DefaultValue),
 			AllowedValues: w.AllowedValues,
 		}
 	}

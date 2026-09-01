@@ -18,6 +18,14 @@ func newLoadedModel(t *testing.T, props []ghclient.PropertyValue, schema []ghcli
 
 func runeKey(r rune) tea.KeyMsg { return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}} }
 
+// settle fires the pending flash (see keys.go's pendingFlash) directly,
+// without waiting out the real flashDuration, so a hub-screen command key
+// (a/e/d/s/q) reaches its final state in tests immediately.
+func settle(m *singleRepoModel) *singleRepoModel {
+	next, _ := m.Update(flashElapsedMsg{})
+	return next.(*singleRepoModel)
+}
+
 func manyProperties(n int) []ghclient.PropertyValue {
 	props := make([]ghclient.PropertyValue, n)
 	for i := range props {
@@ -65,7 +73,7 @@ func TestSingleRepoModel_OptionPickerScrollsWhenTerminalIsShort(t *testing.T) {
 	m = next.(*singleRepoModel)
 
 	next, _ = m.Update(runeKey('a'))
-	m = next.(*singleRepoModel)
+	m = settle(next.(*singleRepoModel))
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // pick the only candidate name
 	m = next.(*singleRepoModel)
 
@@ -134,7 +142,7 @@ func TestSingleRepoModel_TabAdvancesAndShiftTabGoesBack(t *testing.T) {
 	m := newLoadedModel(t, nil, schema, nil)
 
 	next, _ := m.Update(runeKey('a'))
-	m = next.(*singleRepoModel)
+	m = settle(next.(*singleRepoModel))
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab}) // tab picks the only candidate name, like enter
 	m = next.(*singleRepoModel)
 	if m.editor.step != stepValue {
@@ -226,7 +234,7 @@ func TestSingleRepoModel_FilterNarrowsPropertyList(t *testing.T) {
 	}
 
 	next, _ = m.Update(runeKey('e')) // edit the (only) filtered property
-	m = next.(*singleRepoModel)
+	m = settle(next.(*singleRepoModel))
 	if m.editor == nil || m.editor.name != "TechOrgGroup" {
 		t.Fatalf("expected to edit TechOrgGroup via the filtered view, got editor=%+v", m.editor)
 	}
@@ -249,7 +257,7 @@ func TestSingleRepoModel_HeaderShownOnEveryScreen(t *testing.T) {
 	}
 
 	next, _ := m.Update(runeKey('e'))
-	m = next.(*singleRepoModel)
+	m = settle(next.(*singleRepoModel))
 	if !strings.Contains(m.View(), want) {
 		t.Errorf("edit screen View() missing header %q:\n%s", want, m.View())
 	}
@@ -257,7 +265,7 @@ func TestSingleRepoModel_HeaderShownOnEveryScreen(t *testing.T) {
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	m = next.(*singleRepoModel)
 	next, _ = m.Update(runeKey('d'))
-	m = next.(*singleRepoModel)
+	m = settle(next.(*singleRepoModel))
 	if !strings.Contains(m.View(), want) {
 		t.Errorf("confirm-delete screen View() missing header %q:\n%s", want, m.View())
 	}
@@ -270,11 +278,38 @@ func TestSingleRepoModel_InputScreenHasNoHeader(t *testing.T) {
 	}
 }
 
+func TestSingleRepoModel_CommandKeyFlashesBeforeActing(t *testing.T) {
+	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "team", Value: "platform"}}, nil, ghclient.ErrSchemaUnavailable)
+
+	next, cmd := m.Update(runeKey('d'))
+	m = next.(*singleRepoModel)
+	if m.screen != screenList {
+		t.Fatalf("action should not run yet: screen=%v, want still screenList", m.screen)
+	}
+	if m.pendingFlash == nil || m.pendingFlash.label != "d" {
+		t.Fatalf("pendingFlash = %+v, want label \"d\"", m.pendingFlash)
+	}
+	if !strings.Contains(m.View(), "delete") {
+		t.Errorf("footer should still show the delete hint while flashing:\n%s", m.View())
+	}
+	if cmd == nil {
+		t.Fatal("expected a flash-tick command")
+	}
+
+	m = settle(m)
+	if m.screen != screenConfirmDelete {
+		t.Errorf("after the flash settles: screen=%v, want screenConfirmDelete", m.screen)
+	}
+	if m.pendingFlash != nil {
+		t.Error("pendingFlash should be cleared once its action has run")
+	}
+}
+
 func TestSingleRepoModel_DeleteConfirmAndCancel(t *testing.T) {
 	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "team", Value: "platform"}}, nil, ghclient.ErrSchemaUnavailable)
 
 	next, _ := m.Update(runeKey('d'))
-	m = next.(*singleRepoModel)
+	m = settle(next.(*singleRepoModel))
 	if m.screen != screenConfirmDelete || m.pendingDeleteAt != 0 {
 		t.Fatalf("after 'd': screen=%v pendingDeleteAt=%v, want screenConfirmDelete/0", m.screen, m.pendingDeleteAt)
 	}
@@ -286,7 +321,7 @@ func TestSingleRepoModel_DeleteConfirmAndCancel(t *testing.T) {
 	}
 
 	next, _ = m.Update(runeKey('d'))
-	m = next.(*singleRepoModel)
+	m = settle(next.(*singleRepoModel))
 	next, _ = m.Update(runeKey('y'))
 	m = next.(*singleRepoModel)
 	if m.screen != screenList || len(m.properties) != 0 {
@@ -298,7 +333,7 @@ func TestSingleRepoModel_EditCancelLeavesValueUnchanged(t *testing.T) {
 	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "team", Value: "platform"}}, nil, ghclient.ErrSchemaUnavailable)
 
 	next, _ := m.Update(runeKey('e'))
-	m = next.(*singleRepoModel)
+	m = settle(next.(*singleRepoModel))
 	if m.screen != screenEdit || m.editor == nil {
 		t.Fatalf("after 'e': screen=%v editor=%v, want screenEdit with an editor", m.screen, m.editor)
 	}
@@ -317,7 +352,7 @@ func TestSingleRepoModel_EditSaveUpdatesValue(t *testing.T) {
 	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "team", Value: "platform"}}, nil, ghclient.ErrSchemaUnavailable)
 
 	next, _ := m.Update(runeKey('e'))
-	m = next.(*singleRepoModel)
+	m = settle(next.(*singleRepoModel))
 
 	m.editor.stringInput.SetValue("infra")
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -335,7 +370,7 @@ func TestSingleRepoModel_EditRejectsInvalidKnownFormat(t *testing.T) {
 	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "owner", Value: "b.jones1@elsevier.com"}}, nil, ghclient.ErrSchemaUnavailable)
 
 	next, _ := m.Update(runeKey('e'))
-	m = next.(*singleRepoModel)
+	m = settle(next.(*singleRepoModel))
 
 	m.editor.stringInput.SetValue("not-an-email")
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -375,7 +410,7 @@ func TestSingleRepoModel_SchemaSortedAlphabetically(t *testing.T) {
 
 	// The add-property name picker should list candidates in that same order.
 	next, _ := m.Update(runeKey('a'))
-	m = next.(*singleRepoModel)
+	m = settle(next.(*singleRepoModel))
 	if got := m.editor.namePicker.options; got[0] != "Apple" || got[1] != "Mango" || got[2] != "Zebra" {
 		t.Errorf("add-editor namePicker.options = %v, want alphabetical order", got)
 	}
@@ -390,7 +425,7 @@ func TestSingleRepoModel_FilterNarrowsAddPicker(t *testing.T) {
 	m := newLoadedModel(t, nil, schema, nil)
 
 	next, _ := m.Update(runeKey('a'))
-	m = next.(*singleRepoModel)
+	m = settle(next.(*singleRepoModel))
 
 	next, _ = m.Update(runeKey('?')) // enter filter mode
 	m = next.(*singleRepoModel)
@@ -419,7 +454,7 @@ func TestSingleRepoModel_AddWithSchema(t *testing.T) {
 	m := newLoadedModel(t, nil, schema, nil)
 
 	next, _ := m.Update(runeKey('a'))
-	m = next.(*singleRepoModel)
+	m = settle(next.(*singleRepoModel))
 	if m.screen != screenEdit || m.editor == nil {
 		t.Fatalf("after 'a': screen=%v editor=%v, want screenEdit", m.screen, m.editor)
 	}

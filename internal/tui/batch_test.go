@@ -22,6 +22,14 @@ func newTableModel(t *testing.T, api *fakeAPI, rows []repoRow, schemaByOrg map[s
 	return next.(*batchModel)
 }
 
+// settleBatch fires the pending flash (see keys.go's pendingFlash) directly,
+// without waiting out the real flashDuration, so a hub-screen command key
+// (b/q) reaches its final state in tests immediately.
+func settleBatch(m *batchModel) *batchModel {
+	next, _ := m.Update(flashElapsedMsg{})
+	return next.(*batchModel)
+}
+
 func manyRows(n int) []repoRow {
 	rows := make([]repoRow, n)
 	for i := range rows {
@@ -178,7 +186,7 @@ func TestBatchModel_HeaderShowsOrgAndCount(t *testing.T) {
 	}
 
 	next, _ := m.Update(runeKey('b'))
-	m = next.(*batchModel)
+	m = settleBatch(next.(*batchModel))
 	if !strings.Contains(m.View(), "acme — 2 repo(s)") {
 		t.Errorf("choose-action screen View() missing org/count header:\n%s", m.View())
 	}
@@ -232,7 +240,7 @@ func TestBatchModel_BulkSetAcrossRepos(t *testing.T) {
 	}
 
 	next, _ := m.Update(runeKey('b'))
-	m = next.(*batchModel)
+	m = settleBatch(next.(*batchModel))
 	if m.screen != bScreenChooseAction {
 		t.Fatalf("after 'b': screen=%v, want bScreenChooseAction", m.screen)
 	}
@@ -294,7 +302,7 @@ func TestBatchModel_BulkDeleteSendsNilValue(t *testing.T) {
 	m := newTableModel(t, api, rows, schema)
 
 	next, _ := m.Update(runeKey('b'))
-	m = next.(*batchModel)
+	m = settleBatch(next.(*batchModel))
 	next, _ = m.Update(runeKey('2')) // bulk delete
 	m = next.(*batchModel)
 	if !m.editor.deleteMode {

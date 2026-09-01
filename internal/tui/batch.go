@@ -79,15 +79,16 @@ type batchModel struct {
 	spin   spinner.Model
 	prog   progress.Model
 
-	entries     []repolist.Entry
-	skipped     []repolist.Skipped
-	chunksTotal int
-	chunksDone  int
-	rows        []repoRow
-	schemaByOrg map[string][]ghclient.PropertyDefinition
-	cursor      int
-	filter      string // "?" starts composing this; narrows the table to a case-insensitive substring match on owner/repo
-	filtering   bool
+	entries      []repolist.Entry
+	skipped      []repolist.Skipped
+	chunksTotal  int
+	chunksDone   int
+	rows         []repoRow
+	schemaByOrg  map[string][]ghclient.PropertyDefinition
+	cursor       int
+	filter       string // "?" starts composing this; narrows the table to a case-insensitive substring match on owner/repo
+	filtering    bool
+	pendingFlash *pendingFlash // set by a hub-screen command key; see keys.go
 
 	action        bulkActionKind
 	editor        *valueEditor
@@ -204,6 +205,13 @@ func (m *batchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.applyResultsToRows(msg.results)
 		m.screen = bScreenResult
 		return m, nil
+	case flashElapsedMsg:
+		if m.pendingFlash == nil {
+			return m, nil
+		}
+		action := m.pendingFlash.action
+		m.pendingFlash = nil
+		return action()
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spin, cmd = m.spin.Update(msg)
@@ -319,7 +327,7 @@ func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	indices := m.filteredRowIndices()
 	switch s := msg.String(); {
 	case s == "q":
-		return m, quitRequestedCmd
+		return m.deferAction("q", func() (tea.Model, tea.Cmd) { return m, quitRequestedCmd })
 	case msg.Type == tea.KeyF5:
 		m.screen = bScreenLoading
 		return m, m.startFetch()
@@ -348,9 +356,20 @@ func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case s == "b":
 		m.err = nil
-		m.screen = bScreenChooseAction
+		return m.deferAction("b", func() (tea.Model, tea.Cmd) {
+			m.screen = bScreenChooseAction
+			return m, nil
+		})
 	}
 	return m, nil
+}
+
+// deferAction defers a hub-screen command's effect until its footer key
+// finishes flashing (see keys.go's pendingFlash), instead of running it
+// immediately.
+func (m *batchModel) deferAction(label string, action func() (tea.Model, tea.Cmd)) (tea.Model, tea.Cmd) {
+	m.pendingFlash = &pendingFlash{label: label, action: action}
+	return m, flashTick()
 }
 
 func (m *batchModel) handleChooseActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -701,7 +720,11 @@ func (m *batchModel) viewTableParts() (content, footer string) {
 		b.WriteString("\n" + errorStyle.Render(m.err.Error()) + "\n")
 	}
 
-	footer = helpLine(
+	flashLabel := ""
+	if m.pendingFlash != nil {
+		flashLabel = m.pendingFlash.label
+	}
+	footer = helpLineFlash(flashLabel,
 		keyBinding("↑/k", "up"), keyBinding("↓/j", "down"), keyBinding("b", "bulk edit"), keyBinding("q", "quit"),
 		keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help"),
 	)

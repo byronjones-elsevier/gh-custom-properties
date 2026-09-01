@@ -67,6 +67,7 @@ type singleRepoModel struct {
 	filtering       bool
 	pendingDeleteAt int // -1 when not confirming a delete
 	editor          *valueEditor
+	pendingFlash    *pendingFlash // set by a hub-screen command key; see keys.go
 
 	width, height int // last known terminal size, from tea.WindowSizeMsg
 
@@ -163,6 +164,13 @@ func (m *singleRepoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.backupPath = msg.backupPath
 		m.err = msg.err
 		return m, nil
+	case flashElapsedMsg:
+		if m.pendingFlash == nil {
+			return m, nil
+		}
+		action := m.pendingFlash.action
+		m.pendingFlash = nil
+		return action()
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spin, cmd = m.spin.Update(msg)
@@ -300,7 +308,7 @@ func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	indices := m.filteredPropertyIndices()
 	switch {
 	case key.Matches(msg, m.keys.Quit):
-		return m, quitRequestedCmd
+		return m.deferAction("q", func() (tea.Model, tea.Cmd) { return m, quitRequestedCmd })
 	case msg.Type == tea.KeyF5:
 		m.screen = screenLoading
 		m.err = nil
@@ -335,9 +343,11 @@ func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.err = nil
-		m.editor = newAddEditor(candidates, m.schema == nil, availableRows(m.height))
-		m.screen = screenEdit
-		return m, m.editor.Init()
+		return m.deferAction("a", func() (tea.Model, tea.Cmd) {
+			m.editor = newAddEditor(candidates, m.schema == nil, availableRows(m.height))
+			m.screen = screenEdit
+			return m, m.editor.Init()
+		})
 	case key.Matches(msg, m.keys.Edit):
 		if m.cursor < 0 || m.cursor >= len(indices) {
 			return m, nil
@@ -348,23 +358,39 @@ func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			def = &d
 		}
 		m.err = nil
-		m.editor = newEditEditor(p.Name, def, p.Value, availableRows(m.height))
-		m.screen = screenEdit
-		return m, m.editor.Init()
+		return m.deferAction("enter/e", func() (tea.Model, tea.Cmd) {
+			m.editor = newEditEditor(p.Name, def, p.Value, availableRows(m.height))
+			m.screen = screenEdit
+			return m, m.editor.Init()
+		})
 	case key.Matches(msg, m.keys.Delete):
 		if m.cursor < 0 || m.cursor >= len(indices) {
 			return m, nil
 		}
-		m.pendingDeleteAt = indices[m.cursor]
-		m.screen = screenConfirmDelete
+		deleteAt := indices[m.cursor]
+		return m.deferAction("d", func() (tea.Model, tea.Cmd) {
+			m.pendingDeleteAt = deleteAt
+			m.screen = screenConfirmDelete
+			return m, nil
+		})
 	case key.Matches(msg, m.keys.Save):
 		if len(m.properties) == 0 {
 			return m, nil
 		}
-		m.screen = screenApplying
-		return m, m.applyCmd()
+		return m.deferAction("s", func() (tea.Model, tea.Cmd) {
+			m.screen = screenApplying
+			return m, m.applyCmd()
+		})
 	}
 	return m, nil
+}
+
+// deferAction defers a hub-screen command's effect until its footer key
+// finishes flashing (see keys.go's pendingFlash), instead of running it
+// immediately.
+func (m *singleRepoModel) deferAction(label string, action func() (tea.Model, tea.Cmd)) (tea.Model, tea.Cmd) {
+	m.pendingFlash = &pendingFlash{label: label, action: action}
+	return m, flashTick()
 }
 
 func (m *singleRepoModel) handleLoaded(msg loadedMsg) (tea.Model, tea.Cmd) {
@@ -516,7 +542,11 @@ func (m *singleRepoModel) viewListParts() (content, footer string) {
 		b.WriteString("\n" + errorStyle.Render(m.err.Error()) + "\n")
 	}
 
-	footer = helpLine(
+	flashLabel := ""
+	if m.pendingFlash != nil {
+		flashLabel = m.pendingFlash.label
+	}
+	footer = helpLineFlash(flashLabel,
 		m.keys.Up, m.keys.Down, m.keys.Add, m.keys.Edit, m.keys.Delete, m.keys.Save, m.keys.Quit,
 		keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help"),
 	)

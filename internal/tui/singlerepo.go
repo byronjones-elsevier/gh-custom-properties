@@ -235,6 +235,10 @@ func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Quit):
 		return m, quitRequestedCmd
+	case msg.Type == tea.KeyF5:
+		m.screen = screenLoading
+		m.err = nil
+		return m, tea.Batch(m.spin.Tick, m.loadCmd())
 	case key.Matches(msg, m.keys.Up):
 		if m.cursor > 0 {
 			m.cursor--
@@ -439,7 +443,7 @@ func (m *singleRepoModel) viewListParts() (content, footer string) {
 
 	footer = helpLine(
 		m.keys.Up, m.keys.Down, m.keys.Add, m.keys.Edit, m.keys.Delete, m.keys.Save, m.keys.Quit,
-		keyBinding("F1", "help"),
+		keyBinding("F5", "refresh"), keyBinding("F1", "help"),
 	)
 	return b.String(), footer
 }

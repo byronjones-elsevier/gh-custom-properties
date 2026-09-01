@@ -99,6 +99,41 @@ func TestBatchModel_PageDownAndUp(t *testing.T) {
 	}
 }
 
+func TestBatchModel_F5Refetches(t *testing.T) {
+	api := &fakeAPI{}
+	m := newTableModel(t, api, manyRows(2), nil)
+	if api.getCallsCount != 0 {
+		t.Fatalf("setup: getCallsCount = %d, want 0 before any F5", api.getCallsCount)
+	}
+
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyF5})
+	m = next.(*batchModel)
+	if m.screen != bScreenLoading || len(m.rows) != 0 {
+		t.Fatalf("after F5: screen=%v rows=%v, want bScreenLoading with rows reset", m.screen, m.rows)
+	}
+	if cmd == nil {
+		t.Fatal("F5 should return a fetch command")
+	}
+
+	batch, ok := cmd().(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("expected a tea.BatchMsg, got %T", cmd())
+	}
+	for _, c := range batch {
+		if chunkMsg, ok := c().(batchChunkMsg); ok {
+			next, _ = m.Update(chunkMsg)
+			m = next.(*batchModel)
+		}
+	}
+
+	if m.screen != bScreenTable || len(m.rows) != 2 {
+		t.Fatalf("after refetch completes: screen=%v rows=%v", m.screen, m.rows)
+	}
+	if api.getCallsCount != 2 {
+		t.Errorf("getCallsCount = %d, want 2 (one per row)", api.getCallsCount)
+	}
+}
+
 func TestBatchModel_HeaderShowsOrgAndCount(t *testing.T) {
 	api := &fakeAPI{}
 	rows := []repoRow{

@@ -13,11 +13,13 @@ type fakeAPI struct {
 	schema     []ghclient.PropertyDefinition
 	schemaErr  error
 
-	setCalls [][]ghclient.PropertyValue
-	setErr   error
+	setCalls      [][]ghclient.PropertyValue
+	setErr        error
+	getCallsCount int
 }
 
 func (f *fakeAPI) GetRepoProperties(ctx context.Context, owner, repo string) ([]ghclient.PropertyValue, error) {
+	f.getCallsCount++
 	return append([]ghclient.PropertyValue{}, f.properties...), nil
 }
 

@@ -156,6 +156,49 @@ func TestSingleRepoModel_TabAdvancesAndShiftTabGoesBack(t *testing.T) {
 	}
 }
 
+func TestSingleRepoModel_F5RefreshesFromGitHub(t *testing.T) {
+	api := &fakeAPI{properties: []ghclient.PropertyValue{{Name: "team", Value: "platform"}}}
+	m := newSingleRepoModel(api, t.TempDir(), "octocat", "hello-world")
+	next, _ := m.handleLoaded(loadedMsg{owner: "octocat", repo: "hello-world", properties: api.properties, schemaErr: ghclient.ErrSchemaUnavailable})
+	m = next.(*singleRepoModel)
+	if api.getCallsCount != 0 {
+		t.Fatalf("setup: getCallsCount = %d, want 0 before any F5", api.getCallsCount)
+	}
+
+	// Stage an unsaved edit.
+	m.properties[0].Value = "staged-but-not-applied"
+
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyF5})
+	m = next.(*singleRepoModel)
+	if m.screen != screenLoading {
+		t.Fatalf("after F5: screen=%v, want screenLoading", m.screen)
+	}
+	if cmd == nil {
+		t.Fatal("F5 should return a fetch command")
+	}
+
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("expected a tea.BatchMsg, got %T", msg)
+	}
+	var loaded loadedMsg
+	for _, c := range batch {
+		if lm, ok := c().(loadedMsg); ok {
+			loaded = lm
+		}
+	}
+	next, _ = m.Update(loaded)
+	m = next.(*singleRepoModel)
+
+	if api.getCallsCount != 1 {
+		t.Errorf("getCallsCount = %d, want 1", api.getCallsCount)
+	}
+	if m.properties[0].Value != "platform" {
+		t.Errorf("properties[0].Value = %v, want the refetched value, discarding the staged edit", m.properties[0].Value)
+	}
+}
+
 func TestSingleRepoModel_HeaderShownOnEveryScreen(t *testing.T) {
 	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "team", Value: "platform"}}, nil, ghclient.ErrSchemaUnavailable)
 	const want = "octocat/hello-world"

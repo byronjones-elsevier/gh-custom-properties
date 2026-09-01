@@ -115,6 +115,19 @@ func newBatchModel(api ghclient.PropertiesAPI, backupDir string, entries []repol
 }
 
 func (m *batchModel) Init() tea.Cmd {
+	return m.startFetch()
+}
+
+// startFetch (re)issues the chunked fetch across all entries, resetting any
+// previously accumulated rows/schema/progress — used both by Init and by
+// F5 refresh from the table screen.
+func (m *batchModel) startFetch() tea.Cmd {
+	m.rows = nil
+	m.schemaByOrg = nil
+	m.chunksDone = 0
+	m.cursor = 0
+	m.err = nil
+
 	chunks := chunkEntries(m.entries, batchFetchWorkers)
 	m.chunksTotal = len(chunks)
 	cmds := make([]tea.Cmd, 0, len(chunks)+1)
@@ -241,6 +254,9 @@ func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch s := msg.String(); {
 	case s == "q":
 		return m, quitRequestedCmd
+	case msg.Type == tea.KeyF5:
+		m.screen = bScreenLoading
+		return m, m.startFetch()
 	case s == "up" || s == "k":
 		if m.cursor > 0 {
 			m.cursor--
@@ -611,7 +627,7 @@ func (m *batchModel) viewTableParts() (content, footer string) {
 
 	footer = helpLine(
 		keyBinding("↑/k", "up"), keyBinding("↓/j", "down"), keyBinding("b", "bulk edit"), keyBinding("q", "quit"),
-		keyBinding("F1", "help"),
+		keyBinding("F5", "refresh"), keyBinding("F1", "help"),
 	)
 	return b.String(), footer
 }

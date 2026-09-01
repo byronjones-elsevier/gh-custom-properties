@@ -22,11 +22,11 @@ const (
 
 // PropertyDefinition describes one property in an org's custom-property schema.
 type PropertyDefinition struct {
-	Name          string
-	Type          PropertyType
-	Required      bool
-	DefaultValue  any
-	AllowedValues []string
+	Name          string       `json:"name"`
+	Type          PropertyType `json:"type"`
+	Required      bool         `json:"required"`
+	DefaultValue  any          `json:"default_value,omitempty"`
+	AllowedValues []string     `json:"allowed_values,omitempty"`
 }
 
 // PropertyValue is a single property name/value pair on a repository.
@@ -35,8 +35,8 @@ type PropertyDefinition struct {
 // rather than a JSON boolean, so callers editing a true_false property
 // should use those string values.
 type PropertyValue struct {
-	Name  string
-	Value any
+	Name  string `json:"name"`
+	Value any    `json:"value"`
 }
 
 // normalizeValue converts the result of unmarshaling a property value from
@@ -56,13 +56,4 @@ func normalizeValue(v any) any {
 		}
 	}
 	return out
-}
-
-// RepoProperties bundles a repo's identity with its current property values,
-// used when fetching/backing up many repos at once in batch mode.
-type RepoProperties struct {
-	Owner      string
-	Repo       string
-	Properties []PropertyValue
-	Err        error // non-nil if the fetch for this repo failed
 }

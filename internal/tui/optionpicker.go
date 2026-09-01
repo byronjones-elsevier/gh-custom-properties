@@ -31,6 +31,23 @@ func (p *optionPicker) down() {
 	}
 }
 
+func (p *optionPicker) pageUp() {
+	p.cursor -= pageSize(p.maxVisible)
+	if p.cursor < 0 {
+		p.cursor = 0
+	}
+}
+
+func (p *optionPicker) pageDown() {
+	p.cursor += pageSize(p.maxVisible)
+	if last := len(p.options) - 1; p.cursor > last {
+		p.cursor = last
+	}
+	if p.cursor < 0 {
+		p.cursor = 0
+	}
+}
+
 func (p *optionPicker) toggle() {
 	p.checked[p.cursor] = !p.checked[p.cursor]
 }

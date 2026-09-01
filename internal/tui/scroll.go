@@ -43,6 +43,26 @@ func visibleWindow(n, cursor, maxVisible int) (start, end int) {
 	return start, end
 }
 
+// defaultPageSize is how far Page Up/Down move the cursor when the visible
+// window size is unknown (maxVisible <= 0, e.g. before the first
+// tea.WindowSizeMsg or in a test that never sends one).
+const defaultPageSize = 10
+
+// pageSize returns how far a single Page Up/Down press should move the
+// cursor: a full visible window when known, otherwise defaultPageSize.
+func pageSize(maxVisible int) int {
+	if maxVisible > 0 {
+		return maxVisible
+	}
+	return defaultPageSize
+}
+
+// isPageUpKey/isPageDownKey match a tea.KeyMsg.String() against the keys
+// TUI.md specifies for paging through a long list: PgUp/PgDn, F7/F8, and
+// Shift+Up/Shift+Down.
+func isPageUpKey(s string) bool   { return s == "pgup" || s == "f7" || s == "shift+up" }
+func isPageDownKey(s string) bool { return s == "pgdown" || s == "f8" || s == "shift+down" }
+
 // availableRows estimates how many list rows fit in the terminal after
 // leaving room for the header, a screen title, and a help footer, given the
 // last known terminal height. Returns 0 ("unbounded") when height is

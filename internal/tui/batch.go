@@ -238,18 +238,31 @@ func (m *batchModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q":
+	switch s := msg.String(); {
+	case s == "q":
 		return m, quitRequestedCmd
-	case "up", "k":
+	case s == "up" || s == "k":
 		if m.cursor > 0 {
 			m.cursor--
 		}
-	case "down", "j":
+	case s == "down" || s == "j":
 		if m.cursor < len(m.rows)-1 {
 			m.cursor++
 		}
-	case "b":
+	case isPageUpKey(s):
+		m.cursor -= pageSize(availableRows(m.height))
+		if m.cursor < 0 {
+			m.cursor = 0
+		}
+	case isPageDownKey(s):
+		m.cursor += pageSize(availableRows(m.height))
+		if last := len(m.rows) - 1; m.cursor > last {
+			m.cursor = last
+		}
+		if m.cursor < 0 {
+			m.cursor = 0
+		}
+	case s == "b":
 		m.err = nil
 		m.screen = bScreenChooseAction
 	}
@@ -289,22 +302,26 @@ func (m *batchModel) handleChoosePropertyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 }
 
 func (m *batchModel) handleChooseTargetsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "up", "k":
+	switch s := msg.String(); {
+	case s == "up" || s == "k":
 		m.targets.up()
-	case "down", "j":
+	case s == "down" || s == "j":
 		m.targets.down()
-	case " ":
+	case isPageUpKey(s):
+		m.targets.pageUp()
+	case isPageDownKey(s):
+		m.targets.pageDown()
+	case s == " ":
 		m.targets.toggle()
-	case "a":
+	case s == "a":
 		for i := range m.targetRow {
 			m.targets.checked[i] = true
 		}
-	case "n":
+	case s == "n":
 		m.targets.checked = map[int]bool{}
-	case "enter":
+	case s == "enter":
 		return m, m.startApply()
-	case "esc":
+	case s == "esc":
 		m.screen = bScreenTable
 	}
 	return m, nil

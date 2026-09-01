@@ -195,12 +195,16 @@ func (e *valueEditor) updateNameStep(keyMsg tea.KeyMsg) (tea.Cmd, editorOutcome)
 		return cmd, outcomeNone
 	}
 
-	switch keyMsg.String() {
-	case "up", "k":
+	switch s := keyMsg.String(); {
+	case s == "up" || s == "k":
 		e.namePicker.up()
-	case "down", "j":
+	case s == "down" || s == "j":
 		e.namePicker.down()
-	case "enter":
+	case isPageUpKey(s):
+		e.namePicker.pageUp()
+	case isPageDownKey(s):
+		e.namePicker.pageDown()
+	case s == "enter":
 		if e.namePicker.cursor < 0 || e.namePicker.cursor >= len(e.nameCandidates) {
 			return nil, outcomeNone
 		}
@@ -219,16 +223,20 @@ func (e *valueEditor) updateNameStep(keyMsg tea.KeyMsg) (tea.Cmd, editorOutcome)
 
 func (e *valueEditor) updateValueStep(keyMsg tea.KeyMsg) (tea.Cmd, editorOutcome) {
 	if e.picker != nil {
-		switch keyMsg.String() {
-		case "up", "k":
+		switch s := keyMsg.String(); {
+		case s == "up" || s == "k":
 			e.picker.up()
-		case "down", "j":
+		case s == "down" || s == "j":
 			e.picker.down()
-		case " ":
+		case isPageUpKey(s):
+			e.picker.pageUp()
+		case isPageDownKey(s):
+			e.picker.pageDown()
+		case s == " ":
 			if e.picker.multi {
 				e.picker.toggle()
 			}
-		case "enter":
+		case s == "enter":
 			return nil, outcomeDone
 		}
 		return nil, outcomeNone

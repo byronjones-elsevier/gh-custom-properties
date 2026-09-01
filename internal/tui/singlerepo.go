@@ -243,6 +243,19 @@ func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor < len(m.properties)-1 {
 			m.cursor++
 		}
+	case isPageUpKey(msg.String()):
+		m.cursor -= pageSize(availableRows(m.height))
+		if m.cursor < 0 {
+			m.cursor = 0
+		}
+	case isPageDownKey(msg.String()):
+		m.cursor += pageSize(availableRows(m.height))
+		if last := len(m.properties) - 1; m.cursor > last {
+			m.cursor = last
+		}
+		if m.cursor < 0 {
+			m.cursor = 0
+		}
 	case key.Matches(msg, m.keys.Add):
 		candidates := m.unsetSchemaProperties()
 		if m.schema != nil && len(candidates) == 0 {

@@ -93,6 +93,40 @@ func TestSingleRepoModel_FooterPinnedToLastRow(t *testing.T) {
 	}
 }
 
+func TestSingleRepoModel_PageDownAndUp(t *testing.T) {
+	m := newLoadedModel(t, manyProperties(40), nil, ghclient.ErrSchemaUnavailable)
+
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = next.(*singleRepoModel)
+
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	m = next.(*singleRepoModel)
+	if m.cursor == 0 {
+		t.Fatal("PgDown should have moved the cursor")
+	}
+	afterOnePage := m.cursor
+
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyF8})
+	m = next.(*singleRepoModel)
+	if m.cursor <= afterOnePage {
+		t.Fatalf("F8 should page down further: cursor=%d, want > %d", m.cursor, afterOnePage)
+	}
+
+	for i := 0; i < 10; i++ {
+		next, _ = m.Update(tea.KeyMsg{Type: tea.KeyShiftDown})
+		m = next.(*singleRepoModel)
+	}
+	if m.cursor != len(m.properties)-1 {
+		t.Errorf("cursor = %d, want clamped to last index %d", m.cursor, len(m.properties)-1)
+	}
+
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgUp})
+	m = next.(*singleRepoModel)
+	if m.cursor == len(m.properties)-1 {
+		t.Fatal("PgUp should have moved the cursor back")
+	}
+}
+
 func TestSingleRepoModel_HeaderShownOnEveryScreen(t *testing.T) {
 	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "team", Value: "platform"}}, nil, ghclient.ErrSchemaUnavailable)
 	const want = "octocat/hello-world"

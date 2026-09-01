@@ -72,6 +72,33 @@ func TestBatchModel_FooterPinnedToLastRow(t *testing.T) {
 	}
 }
 
+func TestBatchModel_PageDownAndUp(t *testing.T) {
+	m := newTableModel(t, &fakeAPI{}, manyRows(40), nil)
+
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = next.(*batchModel)
+
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	m = next.(*batchModel)
+	if m.cursor == 0 {
+		t.Fatal("PgDown should have moved the cursor")
+	}
+
+	for i := 0; i < 10; i++ {
+		next, _ = m.Update(tea.KeyMsg{Type: tea.KeyF8})
+		m = next.(*batchModel)
+	}
+	if m.cursor != len(m.rows)-1 {
+		t.Errorf("cursor = %d, want clamped to last index %d", m.cursor, len(m.rows)-1)
+	}
+
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyShiftUp})
+	m = next.(*batchModel)
+	if m.cursor == len(m.rows)-1 {
+		t.Error("PgUp-equivalent should have moved the cursor back")
+	}
+}
+
 func TestBatchModel_HeaderShowsOrgAndCount(t *testing.T) {
 	api := &fakeAPI{}
 	rows := []repoRow{

@@ -63,6 +63,8 @@ type singleRepoModel struct {
 	schemaErr    error
 
 	cursor          int
+	filter          string // "?" starts composing this; narrows the property list to a case-insensitive substring match on name
+	filtering       bool
 	pendingDeleteAt int // -1 when not confirming a delete
 	editor          *valueEditor
 
@@ -231,7 +233,71 @@ func (m *singleRepoModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// filteredPropertyIndices returns the indices into m.properties matching
+// m.filter (all of them when the filter is empty).
+func (m *singleRepoModel) filteredPropertyIndices() []int {
+	names := make([]string, len(m.properties))
+	for i, p := range m.properties {
+		names[i] = p.Name
+	}
+	return filterIndices(names, m.filter)
+}
+
+func (m *singleRepoModel) clearFilter() {
+	m.filter = ""
+	m.filtering = false
+	m.cursor = 0
+}
+
 func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.Type == tea.KeyEsc && (m.filtering || m.filter != "") {
+		m.clearFilter()
+		return m, nil
+	}
+
+	if m.filtering {
+		indices := m.filteredPropertyIndices()
+		switch s := msg.String(); {
+		case s == "enter":
+			m.filtering = false
+		case msg.Type == tea.KeyBackspace:
+			if m.filter != "" {
+				runes := []rune(m.filter)
+				m.filter = string(runes[:len(runes)-1])
+				m.cursor = 0
+			}
+		case s == "up":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case s == "down":
+			if m.cursor < len(indices)-1 {
+				m.cursor++
+			}
+		case isPageUpKey(s):
+			m.cursor -= pageSize(availableRows(m.height))
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+		case isPageDownKey(s):
+			m.cursor += pageSize(availableRows(m.height))
+			if last := len(indices) - 1; m.cursor > last {
+				m.cursor = last
+			}
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+		case msg.Type == tea.KeySpace:
+			m.filter += " "
+			m.cursor = 0
+		case msg.Type == tea.KeyRunes:
+			m.filter += string(msg.Runes)
+			m.cursor = 0
+		}
+		return m, nil
+	}
+
+	indices := m.filteredPropertyIndices()
 	switch {
 	case key.Matches(msg, m.keys.Quit):
 		return m, quitRequestedCmd
@@ -239,12 +305,14 @@ func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenLoading
 		m.err = nil
 		return m, tea.Batch(m.spin.Tick, m.loadCmd())
+	case msg.String() == "?":
+		m.filtering = true
 	case key.Matches(msg, m.keys.Up):
 		if m.cursor > 0 {
 			m.cursor--
 		}
 	case key.Matches(msg, m.keys.Down):
-		if m.cursor < len(m.properties)-1 {
+		if m.cursor < len(indices)-1 {
 			m.cursor++
 		}
 	case isPageUpKey(msg.String()):
@@ -254,7 +322,7 @@ func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case isPageDownKey(msg.String()):
 		m.cursor += pageSize(availableRows(m.height))
-		if last := len(m.properties) - 1; m.cursor > last {
+		if last := len(indices) - 1; m.cursor > last {
 			m.cursor = last
 		}
 		if m.cursor < 0 {
@@ -271,10 +339,10 @@ func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenEdit
 		return m, m.editor.Init()
 	case key.Matches(msg, m.keys.Edit):
-		if len(m.properties) == 0 {
+		if m.cursor < 0 || m.cursor >= len(indices) {
 			return m, nil
 		}
-		p := m.properties[m.cursor]
+		p := m.properties[indices[m.cursor]]
 		var def *ghclient.PropertyDefinition
 		if d, ok := m.schemaByName[p.Name]; ok {
 			def = &d
@@ -284,10 +352,10 @@ func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenEdit
 		return m, m.editor.Init()
 	case key.Matches(msg, m.keys.Delete):
-		if len(m.properties) == 0 {
+		if m.cursor < 0 || m.cursor >= len(indices) {
 			return m, nil
 		}
-		m.pendingDeleteAt = m.cursor
+		m.pendingDeleteAt = indices[m.cursor]
 		m.screen = screenConfirmDelete
 	case key.Matches(msg, m.keys.Save):
 		if len(m.properties) == 0 {
@@ -416,15 +484,22 @@ func (m *singleRepoModel) viewListParts() (content, footer string) {
 		b.WriteString(warnStyle.Render("org schema unavailable — editing values as freeform text") + "\n\n")
 	}
 
+	if m.filtering || m.filter != "" {
+		b.WriteString(dimStyle.Render("Filter: "+m.filter) + "\n")
+	}
+
+	indices := m.filteredPropertyIndices()
 	if len(m.properties) == 0 {
 		b.WriteString(dimStyle.Render("(no custom properties set)") + "\n")
+	} else if len(indices) == 0 {
+		b.WriteString(dimStyle.Render("(no matches)") + "\n")
 	} else {
-		start, end := visibleWindow(len(m.properties), m.cursor, availableRows(m.height))
+		start, end := visibleWindow(len(indices), m.cursor, availableRows(m.height))
 		if start > 0 {
 			b.WriteString(dimStyle.Render(fmt.Sprintf("  ↑ %d more above", start)) + "\n")
 		}
 		for i := start; i < end; i++ {
-			p := m.properties[i]
+			p := m.properties[indices[i]]
 			line := fmt.Sprintf("%-30s %s", p.Name, formatValue(p.Value))
 			if i == m.cursor {
 				b.WriteString(cursorStyle.Render("> ") + selectedStyle.Render(line) + "\n")
@@ -432,8 +507,8 @@ func (m *singleRepoModel) viewListParts() (content, footer string) {
 				b.WriteString("  " + line + "\n")
 			}
 		}
-		if end < len(m.properties) {
-			b.WriteString(dimStyle.Render(fmt.Sprintf("  ↓ %d more below", len(m.properties)-end)) + "\n")
+		if end < len(indices) {
+			b.WriteString(dimStyle.Render(fmt.Sprintf("  ↓ %d more below", len(indices)-end)) + "\n")
 		}
 	}
 
@@ -443,7 +518,7 @@ func (m *singleRepoModel) viewListParts() (content, footer string) {
 
 	footer = helpLine(
 		m.keys.Up, m.keys.Down, m.keys.Add, m.keys.Edit, m.keys.Delete, m.keys.Save, m.keys.Quit,
-		keyBinding("F5", "refresh"), keyBinding("F1", "help"),
+		keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help"),
 	)
 	return b.String(), footer
 }

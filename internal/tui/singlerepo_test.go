@@ -199,6 +199,47 @@ func TestSingleRepoModel_F5RefreshesFromGitHub(t *testing.T) {
 	}
 }
 
+func TestSingleRepoModel_FilterNarrowsPropertyList(t *testing.T) {
+	m := newLoadedModel(t, []ghclient.PropertyValue{
+		{Name: "TechOrg", Value: "a"},
+		{Name: "TechOrgGroup", Value: "b"},
+		{Name: "owner", Value: "c"},
+	}, nil, ghclient.ErrSchemaUnavailable)
+
+	next, _ := m.Update(runeKey('?'))
+	m = next.(*singleRepoModel)
+	if !m.filtering {
+		t.Fatal("'?' should enter filtering mode")
+	}
+	for _, r := range "group" {
+		next, _ = m.Update(runeKey(r))
+		m = next.(*singleRepoModel)
+	}
+	if got := m.filteredPropertyIndices(); len(got) != 1 {
+		t.Fatalf("filteredPropertyIndices() = %v, want exactly TechOrgGroup", got)
+	}
+
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // lock in the filter
+	m = next.(*singleRepoModel)
+	if m.filtering {
+		t.Fatal("enter should stop typing, not re-run the add/edit flow")
+	}
+
+	next, _ = m.Update(runeKey('e')) // edit the (only) filtered property
+	m = next.(*singleRepoModel)
+	if m.editor == nil || m.editor.name != "TechOrgGroup" {
+		t.Fatalf("expected to edit TechOrgGroup via the filtered view, got editor=%+v", m.editor)
+	}
+
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc}) // cancel the editor, back to the list
+	m = next.(*singleRepoModel)
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc}) // clear the filter
+	m = next.(*singleRepoModel)
+	if m.filter != "" {
+		t.Errorf("filter = %q, want cleared", m.filter)
+	}
+}
+
 func TestSingleRepoModel_HeaderShownOnEveryScreen(t *testing.T) {
 	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "team", Value: "platform"}}, nil, ghclient.ErrSchemaUnavailable)
 	const want = "octocat/hello-world"
@@ -337,6 +378,37 @@ func TestSingleRepoModel_SchemaSortedAlphabetically(t *testing.T) {
 	m = next.(*singleRepoModel)
 	if got := m.editor.namePicker.options; got[0] != "Apple" || got[1] != "Mango" || got[2] != "Zebra" {
 		t.Errorf("add-editor namePicker.options = %v, want alphabetical order", got)
+	}
+}
+
+func TestSingleRepoModel_FilterNarrowsAddPicker(t *testing.T) {
+	schema := []ghclient.PropertyDefinition{
+		{Name: "TechOrg", Type: ghclient.PropertyTypeString},
+		{Name: "TechOrgGroup", Type: ghclient.PropertyTypeSingleSelect, AllowedValues: []string{"Group A", "Group B"}},
+		{Name: "owner", Type: ghclient.PropertyTypeString},
+	}
+	m := newLoadedModel(t, nil, schema, nil)
+
+	next, _ := m.Update(runeKey('a'))
+	m = next.(*singleRepoModel)
+
+	next, _ = m.Update(runeKey('?')) // enter filter mode
+	m = next.(*singleRepoModel)
+	for _, r := range "group" {
+		next, _ = m.Update(runeKey(r))
+		m = next.(*singleRepoModel)
+	}
+	if got := m.editor.namePicker.visibleIndices(); len(got) != 1 {
+		t.Fatalf("filtered namePicker indices = %v, want exactly TechOrgGroup", got)
+	}
+
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // lock in the filter
+	m = next.(*singleRepoModel)
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // confirm the (only) filtered candidate
+	m = next.(*singleRepoModel)
+
+	if m.editor == nil || m.editor.name != "TechOrgGroup" {
+		t.Fatalf("expected TechOrgGroup to be picked via filter, got editor=%+v", m.editor)
 	}
 }
 

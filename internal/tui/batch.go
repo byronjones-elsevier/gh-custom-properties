@@ -86,6 +86,8 @@ type batchModel struct {
 	rows        []repoRow
 	schemaByOrg map[string][]ghclient.PropertyDefinition
 	cursor      int
+	filter      string // "?" starts composing this; narrows the table to a case-insensitive substring match on owner/repo
+	filtering   bool
 
 	action        bulkActionKind
 	editor        *valueEditor
@@ -250,19 +252,85 @@ func (m *batchModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// filteredRowIndices returns the indices into m.rows matching m.filter
+// (against "owner/repo") — all of them when the filter is empty.
+func (m *batchModel) filteredRowIndices() []int {
+	labels := make([]string, len(m.rows))
+	for i, r := range m.rows {
+		labels[i] = r.label()
+	}
+	return filterIndices(labels, m.filter)
+}
+
+func (m *batchModel) clearFilter() {
+	m.filter = ""
+	m.filtering = false
+	m.cursor = 0
+}
+
 func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.Type == tea.KeyEsc && (m.filtering || m.filter != "") {
+		m.clearFilter()
+		return m, nil
+	}
+
+	if m.filtering {
+		indices := m.filteredRowIndices()
+		switch s := msg.String(); {
+		case s == "enter":
+			m.filtering = false
+		case msg.Type == tea.KeyBackspace:
+			if m.filter != "" {
+				runes := []rune(m.filter)
+				m.filter = string(runes[:len(runes)-1])
+				m.cursor = 0
+			}
+		case s == "up":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case s == "down":
+			if m.cursor < len(indices)-1 {
+				m.cursor++
+			}
+		case isPageUpKey(s):
+			m.cursor -= pageSize(availableRows(m.height))
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+		case isPageDownKey(s):
+			m.cursor += pageSize(availableRows(m.height))
+			if last := len(indices) - 1; m.cursor > last {
+				m.cursor = last
+			}
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+		case msg.Type == tea.KeySpace:
+			m.filter += " "
+			m.cursor = 0
+		case msg.Type == tea.KeyRunes:
+			m.filter += string(msg.Runes)
+			m.cursor = 0
+		}
+		return m, nil
+	}
+
+	indices := m.filteredRowIndices()
 	switch s := msg.String(); {
 	case s == "q":
 		return m, quitRequestedCmd
 	case msg.Type == tea.KeyF5:
 		m.screen = bScreenLoading
 		return m, m.startFetch()
+	case s == "?":
+		m.filtering = true
 	case s == "up" || s == "k":
 		if m.cursor > 0 {
 			m.cursor--
 		}
 	case s == "down" || s == "j":
-		if m.cursor < len(m.rows)-1 {
+		if m.cursor < len(indices)-1 {
 			m.cursor++
 		}
 	case isPageUpKey(s):
@@ -272,7 +340,7 @@ func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case isPageDownKey(s):
 		m.cursor += pageSize(availableRows(m.height))
-		if last := len(m.rows) - 1; m.cursor > last {
+		if last := len(indices) - 1; m.cursor > last {
 			m.cursor = last
 		}
 		if m.cursor < 0 {
@@ -596,12 +664,20 @@ func (m *batchModel) viewTableParts() (content, footer string) {
 		b.WriteString(warnStyle.Render(fmt.Sprintf("%d line(s) in the repo list could not be parsed and were skipped", len(m.skipped))) + "\n\n")
 	}
 
-	start, end := visibleWindow(len(m.rows), m.cursor, availableRows(m.height))
+	if m.filtering || m.filter != "" {
+		b.WriteString(dimStyle.Render("Filter: "+m.filter) + "\n")
+	}
+
+	indices := m.filteredRowIndices()
+	if len(m.rows) > 0 && len(indices) == 0 {
+		b.WriteString(dimStyle.Render("(no matches)") + "\n")
+	}
+	start, end := visibleWindow(len(indices), m.cursor, availableRows(m.height))
 	if start > 0 {
 		b.WriteString(dimStyle.Render(fmt.Sprintf("  ↑ %d more above", start)) + "\n")
 	}
 	for i := start; i < end; i++ {
-		r := m.rows[i]
+		r := m.rows[indices[i]]
 		var line string
 		switch {
 		case r.err != nil:
@@ -617,8 +693,8 @@ func (m *batchModel) viewTableParts() (content, footer string) {
 			b.WriteString("  " + line + "\n")
 		}
 	}
-	if end < len(m.rows) {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  ↓ %d more below", len(m.rows)-end)) + "\n")
+	if end < len(indices) {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  ↓ %d more below", len(indices)-end)) + "\n")
 	}
 
 	if m.err != nil {
@@ -627,7 +703,7 @@ func (m *batchModel) viewTableParts() (content, footer string) {
 
 	footer = helpLine(
 		keyBinding("↑/k", "up"), keyBinding("↓/j", "down"), keyBinding("b", "bulk edit"), keyBinding("q", "quit"),
-		keyBinding("F5", "refresh"), keyBinding("F1", "help"),
+		keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help"),
 	)
 	return b.String(), footer
 }

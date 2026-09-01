@@ -2,6 +2,27 @@ package tui
 
 import "strings"
 
+// filterIndices returns the indices into items whose value contains filter
+// as a case-insensitive substring, preserving order. Shared by optionPicker
+// and any plain list/table that adds its own "?" filtering.
+func filterIndices(items []string, filter string) []int {
+	if filter == "" {
+		out := make([]int, len(items))
+		for i := range out {
+			out[i] = i
+		}
+		return out
+	}
+	lf := strings.ToLower(filter)
+	var out []int
+	for i, item := range items {
+		if strings.Contains(strings.ToLower(item), lf) {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 // pinFooter appends footer to content, padding with blank lines first so
 // footer lands on the terminal's last row when height is known. If footer
 // is empty, or height is unknown, no padding is added — the content is

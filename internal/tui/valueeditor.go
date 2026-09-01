@@ -155,6 +155,12 @@ func (e *valueEditor) Update(msg tea.Msg) (tea.Cmd, editorOutcome) {
 	}
 
 	if keyMsg.Type == tea.KeyEsc {
+		// A live filter absorbs the first Esc (clearing it); only once
+		// there's no filter left active does Esc cancel the editor.
+		if p := e.activePicker(); p != nil && (p.filtering || p.filter != "") {
+			p.clearFilter()
+			return nil, outcomeNone
+		}
 		return nil, outcomeCancelled
 	}
 
@@ -162,6 +168,68 @@ func (e *valueEditor) Update(msg tea.Msg) (tea.Cmd, editorOutcome) {
 		return e.updateNameStep(keyMsg)
 	}
 	return e.updateValueStep(keyMsg)
+}
+
+// activePicker returns whichever optionPicker is currently shown (namePicker
+// on the name step, picker on the value step), or nil when the active step
+// uses a text input instead.
+func (e *valueEditor) activePicker() *optionPicker {
+	if e.step == stepName {
+		return e.namePicker
+	}
+	return e.picker
+}
+
+// updatePicker handles a keypress for whichever optionPicker is active.
+// While composing a filter ("?" then typing), rune/space/backspace keys go
+// to the filter text instead of navigating or toggling; enter locks the
+// filter in (returning to normal navigation/toggle/confirm) rather than
+// confirming the outer selection. Returns outcomeDone once the user
+// confirms a selection (enter or tab while not composing a filter).
+func updatePicker(p *optionPicker, keyMsg tea.KeyMsg) editorOutcome {
+	if p.filtering {
+		switch s := keyMsg.String(); {
+		case s == "enter":
+			p.stopFilterTyping()
+		case keyMsg.Type == tea.KeyBackspace:
+			p.backspaceFilter()
+		case s == "up":
+			p.up()
+		case s == "down":
+			p.down()
+		case isPageUpKey(s):
+			p.pageUp()
+		case isPageDownKey(s):
+			p.pageDown()
+		case keyMsg.Type == tea.KeySpace:
+			p.appendFilterRune(' ')
+		case keyMsg.Type == tea.KeyRunes:
+			for _, r := range keyMsg.Runes {
+				p.appendFilterRune(r)
+			}
+		}
+		return outcomeNone
+	}
+
+	switch s := keyMsg.String(); {
+	case s == "up" || s == "k":
+		p.up()
+	case s == "down" || s == "j":
+		p.down()
+	case isPageUpKey(s):
+		p.pageUp()
+	case isPageDownKey(s):
+		p.pageDown()
+	case s == "?":
+		p.startFilter()
+	case s == " ":
+		if p.multi {
+			p.toggle()
+		}
+	case s == "enter" || s == "tab":
+		return outcomeDone
+	}
+	return outcomeNone
 }
 
 func (e *valueEditor) forwardToActiveInput(msg tea.Msg) tea.Cmd {
@@ -195,30 +263,22 @@ func (e *valueEditor) updateNameStep(keyMsg tea.KeyMsg) (tea.Cmd, editorOutcome)
 		return cmd, outcomeNone
 	}
 
-	switch s := keyMsg.String(); {
-	case s == "up" || s == "k":
-		e.namePicker.up()
-	case s == "down" || s == "j":
-		e.namePicker.down()
-	case isPageUpKey(s):
-		e.namePicker.pageUp()
-	case isPageDownKey(s):
-		e.namePicker.pageDown()
-	case s == "enter" || s == "tab":
-		if e.namePicker.cursor < 0 || e.namePicker.cursor >= len(e.nameCandidates) {
-			return nil, outcomeNone
-		}
-		chosen := e.nameCandidates[e.namePicker.cursor]
-		e.name = chosen.Name
-		e.def = &chosen
-		if e.deleteMode {
-			return nil, outcomeDone
-		}
-		e.step = stepValue
-		e.initValueStep(chosen.DefaultValue)
-		return textinput.Blink, outcomeNone
+	if updatePicker(e.namePicker, keyMsg) != outcomeDone {
+		return nil, outcomeNone
 	}
-	return nil, outcomeNone
+	indices := e.namePicker.visibleIndices()
+	if e.namePicker.cursor < 0 || e.namePicker.cursor >= len(indices) {
+		return nil, outcomeNone
+	}
+	chosen := e.nameCandidates[indices[e.namePicker.cursor]]
+	e.name = chosen.Name
+	e.def = &chosen
+	if e.deleteMode {
+		return nil, outcomeDone
+	}
+	e.step = stepValue
+	e.initValueStep(chosen.DefaultValue)
+	return textinput.Blink, outcomeNone
 }
 
 func (e *valueEditor) updateValueStep(keyMsg tea.KeyMsg) (tea.Cmd, editorOutcome) {
@@ -228,23 +288,7 @@ func (e *valueEditor) updateValueStep(keyMsg tea.KeyMsg) (tea.Cmd, editorOutcome
 	}
 
 	if e.picker != nil {
-		switch s := keyMsg.String(); {
-		case s == "up" || s == "k":
-			e.picker.up()
-		case s == "down" || s == "j":
-			e.picker.down()
-		case isPageUpKey(s):
-			e.picker.pageUp()
-		case isPageDownKey(s):
-			e.picker.pageDown()
-		case s == " ":
-			if e.picker.multi {
-				e.picker.toggle()
-			}
-		case s == "enter" || s == "tab":
-			return nil, outcomeDone
-		}
-		return nil, outcomeNone
+		return nil, updatePicker(e.picker, keyMsg)
 	}
 
 	if keyMsg.Type == tea.KeyEnter || keyMsg.String() == "tab" {
@@ -316,10 +360,12 @@ func (e *valueEditor) View() string {
 		if e.deleteMode {
 			nextLabel = "confirm"
 		}
-		b.WriteString("\n" + helpLine(
-			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", nextLabel)),
-			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
-		))
+		hints := []key.Binding{key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", nextLabel))}
+		if !e.freeformName {
+			hints = append(hints, keyBinding("?", "filter"))
+		}
+		hints = append(hints, key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")))
+		b.WriteString("\n" + helpLine(hints...))
 		return b.String()
 	}
 
@@ -335,12 +381,14 @@ func (e *valueEditor) View() string {
 		b.WriteString("\n" + helpLine(
 			key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "toggle")),
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "confirm")),
+			keyBinding("?", "filter"),
 			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
 		))
 	case e.picker != nil:
 		b.WriteString(e.picker.View())
 		b.WriteString("\n" + helpLine(
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "confirm")),
+			keyBinding("?", "filter"),
 			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
 		))
 	default:

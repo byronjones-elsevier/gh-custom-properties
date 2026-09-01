@@ -134,6 +134,38 @@ func TestBatchModel_F5Refetches(t *testing.T) {
 	}
 }
 
+func TestBatchModel_FilterNarrowsTable(t *testing.T) {
+	rows := []repoRow{
+		{owner: "acme", repo: "alpha"},
+		{owner: "acme", repo: "beta"},
+		{owner: "acme", repo: "gamma"},
+	}
+	m := newTableModel(t, &fakeAPI{}, rows, nil)
+
+	next, _ := m.Update(runeKey('?'))
+	m = next.(*batchModel)
+	if !m.filtering {
+		t.Fatal("'?' should enter filtering mode")
+	}
+	for _, r := range "beta" {
+		next, _ = m.Update(runeKey(r))
+		m = next.(*batchModel)
+	}
+	indices := m.filteredRowIndices()
+	if len(indices) != 1 || m.rows[indices[0]].repo != "beta" {
+		t.Fatalf("filteredRowIndices() = %v, want exactly the beta row", indices)
+	}
+
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc}) // clear the filter
+	m = next.(*batchModel)
+	if m.filter != "" || m.filtering {
+		t.Errorf("filter=%q filtering=%v, want cleared", m.filter, m.filtering)
+	}
+	if len(m.filteredRowIndices()) != 3 {
+		t.Errorf("filteredRowIndices() after clear = %d, want all 3", len(m.filteredRowIndices()))
+	}
+}
+
 func TestBatchModel_HeaderShowsOrgAndCount(t *testing.T) {
 	api := &fakeAPI{}
 	rows := []repoRow{

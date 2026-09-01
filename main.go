@@ -49,6 +49,18 @@ func run(args []string) int {
 	}
 	api := ghclient.New(token)
 
+	tui.ApplyPalette(tui.Palette{
+		Title:    cfg.Colors.Title,
+		Header:   cfg.Colors.Header,
+		Cursor:   cfg.Colors.Cursor,
+		Selected: cfg.Colors.Selected,
+		Dim:      cfg.Colors.Dim,
+		Error:    cfg.Colors.Error,
+		Success:  cfg.Colors.Success,
+		Warn:     cfg.Colors.Warn,
+		Help:     cfg.Colors.Help,
+	})
+
 	var model tea.Model
 	if opts.filePath != "" {
 		result, err := repolist.LoadFile(opts.filePath)

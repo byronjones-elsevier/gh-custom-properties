@@ -18,6 +18,7 @@ import (
 type Config struct {
 	BackupDir string
 	Token     string
+	Colors    Palette
 }
 
 // Dir returns $HOME/.gh-custom-properties, creating it if it doesn't exist.
@@ -68,6 +69,7 @@ func Load(env, flags Overrides) (Config, error) {
 	}
 	cfg.BackupDir = fileValues["backup_dir"]
 	cfg.Token = fileValues["token"]
+	cfg.Colors = paletteFromFile(fileValues)
 
 	if env.BackupDir != "" {
 		cfg.BackupDir = env.BackupDir

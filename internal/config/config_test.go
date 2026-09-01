@@ -70,6 +70,31 @@ func TestLoad_NoFile_UsesDefaultBackupDir(t *testing.T) {
 	}
 }
 
+func TestLoad_PaletteDefaultsAndOverrides(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	cfg, err := Load(Overrides{}, Overrides{})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Colors != defaultPalette() {
+		t.Errorf("cfg.Colors = %+v, want defaults %+v", cfg.Colors, defaultPalette())
+	}
+
+	writeConfigFile(t, home, "color_error=#ff0000\ncolor_success=10\n")
+	cfg, err = Load(Overrides{}, Overrides{})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	want := defaultPalette()
+	want.Error = "#ff0000"
+	want.Success = "10"
+	if cfg.Colors != want {
+		t.Errorf("cfg.Colors = %+v, want %+v", cfg.Colors, want)
+	}
+}
+
 func TestLoad_MalformedLine(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

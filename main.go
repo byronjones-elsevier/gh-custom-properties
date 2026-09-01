@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/clidoc"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/config"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/ghclient"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/repolist"
@@ -16,8 +17,6 @@ import (
 )
 
 //go:generate go run ./docs/gendocs
-
-const version = "0.1.0"
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -102,18 +101,21 @@ func parseArgs(args []string) (cliOptions, int, bool) {
 	var opts cliOptions
 	var help, showVersion bool
 
-	fs.StringVar(&opts.filePath, "file", "", "batch mode: file listing one repo (owner/repo or URL) per line")
-	fs.StringVar(&opts.filePath, "f", "", "shorthand for --file")
-	fs.StringVar(&opts.token, "token", "", "GitHub token, overriding GITHUB_TOKEN / `gh auth token`")
-	fs.StringVar(&opts.token, "t", "", "shorthand for --token")
-	fs.StringVar(&opts.backupDir, "backup-dir", "", "directory to write timestamped backups to (default $HOME/.gh-custom-properties/backups)")
-	fs.BoolVar(&help, "help", false, "show help")
-	fs.BoolVar(&help, "h", false, "shorthand for --help")
-	fs.BoolVar(&help, "H", false, "shorthand for --help")
-	fs.BoolVar(&help, "HELP", false, "shorthand for --help")
-	fs.BoolVar(&help, "?", false, "shorthand for --help")
-	fs.BoolVar(&showVersion, "version", false, "show version")
-	fs.BoolVar(&showVersion, "v", false, "shorthand for --version")
+	// Usage strings are omitted here (left "") since fs.Usage is overridden
+	// with printUsage below; clidoc.GHCustomProperties is the single source
+	// of truth for the descriptions shown to the user.
+	fs.StringVar(&opts.filePath, "file", "", "")
+	fs.StringVar(&opts.filePath, "f", "", "")
+	fs.StringVar(&opts.token, "token", "", "")
+	fs.StringVar(&opts.token, "t", "", "")
+	fs.StringVar(&opts.backupDir, "backup-dir", "", "")
+	fs.BoolVar(&help, "help", false, "")
+	fs.BoolVar(&help, "h", false, "")
+	fs.BoolVar(&help, "H", false, "")
+	fs.BoolVar(&help, "HELP", false, "")
+	fs.BoolVar(&help, "?", false, "")
+	fs.BoolVar(&showVersion, "version", false, "")
+	fs.BoolVar(&showVersion, "v", false, "")
 
 	if err := fs.Parse(args); err != nil {
 		return cliOptions{}, 2, true
@@ -123,7 +125,7 @@ func parseArgs(args []string) (cliOptions, int, bool) {
 		return cliOptions{}, 0, true
 	}
 	if showVersion {
-		fmt.Println("gh-custom-properties", version)
+		fmt.Println(clidoc.GHCustomProperties.Name, clidoc.GHCustomProperties.Version)
 		return cliOptions{}, 0, true
 	}
 
@@ -139,36 +141,5 @@ func parseArgs(args []string) (cliOptions, int, bool) {
 }
 
 func printUsage(w *os.File) {
-	fmt.Fprint(w, `gh-custom-properties - view, add, edit, and delete GitHub custom repo properties
-
-USAGE:
-  gh-custom-properties [flags] [owner/repo | repo-url]
-  gh-custom-properties --file repos.txt [flags]
-
-If no repo argument or --file is given, the TUI prompts for a repo to load.
-
-FLAGS:
-  -f, --file <path>        batch mode: file listing one repo per line
-  -t, --token <token>      GitHub token (overrides GITHUB_TOKEN / gh auth token)
-      --backup-dir <path>  backup directory (default $HOME/.gh-custom-properties/backups)
-  -h, -H, --help, --HELP, -?   show this help
-  -v, --version             show version
-
-AUTHENTICATION:
-  A GitHub token is required, resolved in this order:
-    1. --token
-    2. GITHUB_TOKEN environment variable
-    3. `+"`gh auth token`"+` (if the gh CLI is installed and logged in)
-
-  The token needs permission to read and write custom properties on the
-  target repos, and to read the org's custom-property schema.
-
-REPO LIST FILE FORMAT (--file):
-  One repo per line, as "owner/repo" or a github.com URL. Blank lines and
-  lines starting with '#' are ignored.
-
-BACKUPS:
-  Before any change is applied, a timestamped JSON snapshot of the prior
-  property values is written to the backup directory.
-`)
+	fmt.Fprint(w, clidoc.GHCustomProperties.RenderText())
 }

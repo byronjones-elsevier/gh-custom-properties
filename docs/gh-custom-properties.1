@@ -1,0 +1,38 @@
+.TH GH-CUSTOM-PROPERTIES 1 "1 September 2026" "gh-custom-properties 0.1.0" "User Commands"
+.SH NAME
+gh-custom-properties \- view, add, edit, and delete GitHub custom repo properties
+.SH SYNOPSIS
+.B gh-custom-properties [flags] [owner/repo | repo-url]
+.B gh-custom-properties --file repos.txt [flags]
+.SH DESCRIPTION
+If no repo argument or --file is given, the TUI prompts for a repo to load.
+.SH OPTIONS
+.TP
+.B -f, --file <path>
+batch mode: file listing one repo (owner/repo or URL) per line
+.TP
+.B -t, --token <token>
+GitHub token, overriding GITHUB_TOKEN / `gh auth token`
+.TP
+.B --backup-dir <path>
+directory to write timestamped backups to (default $HOME/.gh-custom-properties/backups)
+.TP
+.B -h, -H, -?, --help, --HELP
+show help
+.TP
+.B -v, --version
+show version
+.SH AUTHENTICATION
+A GitHub token is required, resolved in this order:
+  1. --token
+  2. GITHUB_TOKEN environment variable
+  3. `gh auth token` (if the gh CLI is installed and logged in)
+.PP
+The token needs permission to read and write custom properties on the
+target repos, and to read the org's custom-property schema.
+.SH REPO LIST FILE FORMAT (--FILE)
+One repo per line, as "owner/repo" or a github.com URL. Blank lines and
+lines starting with '#' are ignored.
+.SH BACKUPS
+Before any change is applied, a timestamped JSON snapshot of the prior
+property values is written to the backup directory.

@@ -243,7 +243,7 @@ func (m *batchModel) handleChunk(msg batchChunkMsg) (tea.Model, tea.Cmd) {
 func (m *batchModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.screen {
 	case bScreenLoading:
-		if msg.String() == "q" {
+		if s := msg.String(); s == "q" || s == "alt+q" {
 			return m, quitRequestedCmd
 		}
 	case bScreenTable:
@@ -326,7 +326,7 @@ func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	indices := m.filteredRowIndices()
 	switch s := msg.String(); {
-	case s == "q":
+	case s == "q" || s == "alt+q":
 		return m.deferAction("q", func() (tea.Model, tea.Cmd) { return m, quitRequestedCmd })
 	case msg.Type == tea.KeyF5:
 		m.screen = bScreenLoading
@@ -354,7 +354,7 @@ func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor < 0 {
 			m.cursor = 0
 		}
-	case s == "b":
+	case s == "b" || s == "alt+b":
 		m.err = nil
 		return m.deferAction("b", func() (tea.Model, tea.Cmd) {
 			m.screen = bScreenChooseAction

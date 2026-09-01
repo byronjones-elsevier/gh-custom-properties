@@ -12,6 +12,7 @@ import (
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/config"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/ghclient"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/repolist"
+	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/termkeys"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -86,6 +87,12 @@ func run(args []string) int {
 			}
 		}
 		model = tui.NewSingleRepo(api, cfg.BackupDir, owner, repo)
+	}
+
+	// Must happen before tea.Program.Run() starts reading stdin itself —
+	// the probe briefly takes over raw-mode stdin reading on its own.
+	if altEnabled, err := termkeys.EnableIfAvailable(); err == nil && altEnabled {
+		defer termkeys.Disable()
 	}
 
 	if _, err := tea.NewProgram(model, tea.WithAltScreen()).Run(); err != nil {

@@ -174,6 +174,16 @@ func TestBatchModel_FilterNarrowsTable(t *testing.T) {
 	}
 }
 
+func TestBatchModel_AltBTriggersBulkEdit(t *testing.T) {
+	m := newTableModel(t, &fakeAPI{}, manyRows(2), nil)
+
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}, Alt: true})
+	m = settleBatch(next.(*batchModel))
+	if m.screen != bScreenChooseAction {
+		t.Errorf("after alt+b: screen=%v, want bScreenChooseAction", m.screen)
+	}
+}
+
 func TestBatchModel_HeaderShowsOrgAndCount(t *testing.T) {
 	api := &fakeAPI{}
 	rows := []repoRow{

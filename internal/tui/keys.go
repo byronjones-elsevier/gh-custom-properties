@@ -20,16 +20,22 @@ type listKeyMap struct {
 	Quit   key.Binding
 }
 
+// defaultListKeyMap builds the property-list-style key set. Each custom
+// command additionally matches alt+<letter> (see internal/termkeys) —
+// harmless to register unconditionally, since a terminal that never sends
+// that sequence simply never produces a matching key event, but it means
+// TUI.md's Alt-A..Alt-Z convention works wherever the terminal supports it
+// without gating the bare letter on detection succeeding.
 func defaultListKeyMap() listKeyMap {
 	return listKeyMap{
 		Up:     key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up")),
 		Down:   key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
-		Add:    key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add")),
-		Edit:   key.NewBinding(key.WithKeys("enter", "e"), key.WithHelp("enter/e", "edit")),
-		Delete: key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete")),
-		Save:   key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "apply changes")),
+		Add:    key.NewBinding(key.WithKeys("a", "alt+a"), key.WithHelp("a", "add")),
+		Edit:   key.NewBinding(key.WithKeys("enter", "e", "alt+e"), key.WithHelp("enter/e", "edit")),
+		Delete: key.NewBinding(key.WithKeys("d", "alt+d"), key.WithHelp("d", "delete")),
+		Save:   key.NewBinding(key.WithKeys("s", "alt+s"), key.WithHelp("s", "apply changes")),
 		Cancel: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
-		Quit:   key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
+		Quit:   key.NewBinding(key.WithKeys("q", "alt+q"), key.WithHelp("q", "quit")),
 	}
 }
 

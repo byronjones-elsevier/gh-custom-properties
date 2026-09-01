@@ -347,7 +347,12 @@ func (m *singleRepoModel) header() string {
 }
 
 func (m *singleRepoModel) View() string {
-	return boxStyle.Render(m.header() + m.viewBody())
+	header := m.header()
+	if m.screen == screenList {
+		content, footer := m.viewListParts()
+		return boxStyle.Render(pinFooter(header+content, footer, m.height))
+	}
+	return boxStyle.Render(header + m.viewBody())
 }
 
 func (m *singleRepoModel) viewBody() string {
@@ -356,8 +361,6 @@ func (m *singleRepoModel) viewBody() string {
 		return m.viewInput()
 	case screenLoading:
 		return fmt.Sprintf("\n  %s Loading properties...\n", m.spin.View())
-	case screenList:
-		return m.viewList()
 	case screenEdit:
 		return m.editor.View()
 	case screenConfirmDelete:
@@ -381,11 +384,14 @@ func (m *singleRepoModel) viewInput() string {
 	if m.err != nil {
 		b.WriteString("\n" + errorStyle.Render(m.err.Error()) + "\n")
 	}
-	b.WriteString("\n" + helpLine(keyBinding("enter", "load"), keyBinding("q", "quit")))
+	b.WriteString("\n" + helpLine(keyBinding("enter", "load"), keyBinding("ctrl+c", "quit")))
 	return b.String()
 }
 
-func (m *singleRepoModel) viewList() string {
+// viewListParts renders the property list screen, split into scrollable
+// content and its footer so View can pin the footer to the terminal's last
+// row instead of letting it float wherever the content happens to end.
+func (m *singleRepoModel) viewListParts() (content, footer string) {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Custom properties") + "\n\n")
 
@@ -418,10 +424,11 @@ func (m *singleRepoModel) viewList() string {
 		b.WriteString("\n" + errorStyle.Render(m.err.Error()) + "\n")
 	}
 
-	b.WriteString("\n" + helpLine(
+	footer = helpLine(
 		m.keys.Up, m.keys.Down, m.keys.Add, m.keys.Edit, m.keys.Delete, m.keys.Save, m.keys.Quit,
-	))
-	return b.String()
+		keyBinding("F1", "help"),
+	)
+	return b.String(), footer
 }
 
 func (m *singleRepoModel) viewResult() string {

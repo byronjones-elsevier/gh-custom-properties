@@ -519,15 +519,18 @@ func ownerOfRows(rows []repoRow) string {
 }
 
 func (m *batchModel) View() string {
-	return boxStyle.Render(m.header() + m.viewBody())
+	header := m.header()
+	if m.screen == bScreenTable {
+		content, footer := m.viewTableParts()
+		return boxStyle.Render(pinFooter(header+content, footer, m.height))
+	}
+	return boxStyle.Render(header + m.viewBody())
 }
 
 func (m *batchModel) viewBody() string {
 	switch m.screen {
 	case bScreenLoading:
 		return m.viewLoading()
-	case bScreenTable:
-		return m.viewTable()
 	case bScreenChooseAction:
 		return m.viewChooseAction()
 	case bScreenChooseProperty:
@@ -550,7 +553,10 @@ func (m *batchModel) viewLoading() string {
 	return fmt.Sprintf("\n  %s Loading %d repo(s)...\n\n  %s\n", m.spin.View(), len(m.entries), m.prog.ViewAs(pct))
 }
 
-func (m *batchModel) viewTable() string {
+// viewTableParts renders the repo table screen, split into scrollable
+// content and its footer so View can pin the footer to the terminal's last
+// row instead of letting it float wherever the content happens to end.
+func (m *batchModel) viewTableParts() (content, footer string) {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render(fmt.Sprintf("%d repo(s) loaded", len(m.rows))) + "\n\n")
 	if len(m.skipped) > 0 {
@@ -586,10 +592,11 @@ func (m *batchModel) viewTable() string {
 		b.WriteString("\n" + errorStyle.Render(m.err.Error()) + "\n")
 	}
 
-	b.WriteString("\n" + helpLine(
+	footer = helpLine(
 		keyBinding("↑/k", "up"), keyBinding("↓/j", "down"), keyBinding("b", "bulk edit"), keyBinding("q", "quit"),
-	))
-	return b.String()
+		keyBinding("F1", "help"),
+	)
+	return b.String(), footer
 }
 
 func summarizeProperties(props []ghclient.PropertyValue) string {

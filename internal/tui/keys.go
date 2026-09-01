@@ -30,9 +30,12 @@ func defaultListKeyMap() listKeyMap {
 
 // keyBinding builds a display-only key.Binding for use in helpLine when no
 // key.Matches dispatch is needed (e.g. ad hoc confirm/quit prompts handled
-// by a direct switch on msg.String()).
+// by a direct switch on msg.String()). WithKeys is set to the same display
+// string purely so bubbles' Binding.Enabled() (which requires a non-nil key
+// list) reports true and helpLine doesn't silently drop it — these bindings
+// are never passed through key.Matches, so it has no effect on dispatch.
 func keyBinding(keyStr, desc string) key.Binding {
-	return key.NewBinding(key.WithHelp(keyStr, desc))
+	return key.NewBinding(key.WithKeys(keyStr), key.WithHelp(keyStr, desc))
 }
 
 // helpLine renders a compact single-line help footer from binding help text.

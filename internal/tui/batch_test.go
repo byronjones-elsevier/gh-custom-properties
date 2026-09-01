@@ -57,6 +57,21 @@ func TestBatchModel_TableScrollsWhenTerminalIsShort(t *testing.T) {
 	}
 }
 
+func TestBatchModel_FooterPinnedToLastRow(t *testing.T) {
+	m := newTableModel(t, &fakeAPI{}, manyRows(3), nil)
+
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = next.(*batchModel)
+
+	lines := strings.Split(m.View(), "\n")
+	if len(lines) != 20 {
+		t.Fatalf("got %d lines, want 20:\n%s", len(lines), m.View())
+	}
+	if !strings.Contains(lines[len(lines)-1], "quit") {
+		t.Errorf("last line = %q, want the footer", lines[len(lines)-1])
+	}
+}
+
 func TestBatchModel_HeaderShowsOrgAndCount(t *testing.T) {
 	api := &fakeAPI{}
 	rows := []repoRow{

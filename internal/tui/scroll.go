@@ -1,5 +1,27 @@
 package tui
 
+import "strings"
+
+// pinFooter appends footer to content, padding with blank lines first so
+// footer lands on the terminal's last row when height is known. If footer
+// is empty, or height is unknown, no padding is added — the content is
+// simply returned (with footer appended, if any).
+func pinFooter(content, footer string, height int) string {
+	if footer == "" {
+		return content
+	}
+	if height <= 0 {
+		return content + "\n" + footer
+	}
+	contentLines := strings.Count(content, "\n") + 1
+	footerLines := strings.Count(footer, "\n") + 1
+	pad := height - contentLines - footerLines
+	if pad < 0 {
+		pad = 0
+	}
+	return content + strings.Repeat("\n", pad) + "\n" + footer
+}
+
 // visibleWindow returns the [start, end) slice bounds into a list of length
 // n that keep index cursor visible within at most maxVisible rows.
 // maxVisible <= 0 means "no limit" (the whole list is shown unclipped) —

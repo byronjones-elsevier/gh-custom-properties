@@ -1,6 +1,9 @@
 package tui
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestVisibleWindow(t *testing.T) {
 	tests := []struct {
@@ -29,6 +32,44 @@ func TestVisibleWindow(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPinFooter(t *testing.T) {
+	t.Run("no footer returns content unchanged", func(t *testing.T) {
+		if got := pinFooter("a\nb", "", 10); got != "a\nb" {
+			t.Errorf("got %q", got)
+		}
+	})
+
+	t.Run("unknown height appends footer without padding", func(t *testing.T) {
+		got := pinFooter("a\nb", "footer", 0)
+		want := "a\nb\nfooter"
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("pads footer to the last line at a known height", func(t *testing.T) {
+		content := "a\nb"  // 2 lines
+		footer := "footer" // 1 line
+		got := pinFooter(content, footer, 10)
+		lines := strings.Split(got, "\n")
+		if len(lines) != 10 {
+			t.Fatalf("got %d lines, want 10:\n%q", len(lines), got)
+		}
+		if lines[len(lines)-1] != "footer" {
+			t.Errorf("last line = %q, want %q", lines[len(lines)-1], "footer")
+		}
+	})
+
+	t.Run("content taller than height still appends footer immediately", func(t *testing.T) {
+		content := strings.Repeat("x\n", 20) + "x" // 21 lines
+		got := pinFooter(content, "footer", 5)
+		lines := strings.Split(got, "\n")
+		if lines[len(lines)-1] != "footer" {
+			t.Errorf("last line = %q, want %q", lines[len(lines)-1], "footer")
+		}
+	})
 }
 
 func TestAvailableRows(t *testing.T) {

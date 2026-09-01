@@ -89,6 +89,22 @@ the property's type (text input, single-select list, multi-select
 checklist). `newDeleteEditor` reuses the same name-picking step but
 short-circuits after it, since deleting only needs a name.
 
+### Window size and scrolling
+
+Both models track the terminal size from `tea.WindowSizeMsg` (`width`,
+`height` fields) and use it to bound how many rows a list shows at once —
+`internal/tui/scroll.go`'s `availableRows(height)` estimates how much
+vertical space is left after the header/title/help chrome, and
+`visibleWindow(n, cursor, maxVisible)` returns the `[start, end)` slice
+that keeps the cursor in view within that budget, with a
+"N more above/below" indicator when the list is clipped. This applies to
+the single-repo property list, the batch repo table, and every
+`optionPicker` (name pickers, single/multi-select value pickers, the batch
+target picker) — anywhere a list's length isn't bounded by the data model.
+`maxVisible <= 0` means "show everything unclipped," which is also the
+state before the first `WindowSizeMsg` arrives (e.g. in tests that
+construct a model directly without sending one).
+
 Batch mode fetches and applies with a bounded worker pool (8 by default,
 `batchFetchWorkers`/`batchApplyWorkers` in `internal/tui/batch.go`) rather
 than one goroutine per repo, so a large `--file` doesn't open hundreds of

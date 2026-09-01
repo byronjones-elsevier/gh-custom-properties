@@ -66,6 +66,8 @@ type singleRepoModel struct {
 	pendingDeleteAt int // -1 when not confirming a delete
 	editor          *valueEditor
 
+	width, height int // last known terminal size, from tea.WindowSizeMsg
+
 	backupPath string
 	err        error
 	quitting   bool
@@ -147,6 +149,12 @@ func (m *singleRepoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+		if m.editor != nil {
+			m.editor.setMaxVisible(availableRows(m.height))
+		}
+		return m, nil
 	case loadedMsg:
 		return m.handleLoaded(msg)
 	case appliedMsg:
@@ -246,7 +254,7 @@ func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.err = nil
-		m.editor = newAddEditor(candidates, m.schema == nil)
+		m.editor = newAddEditor(candidates, m.schema == nil, availableRows(m.height))
 		m.screen = screenEdit
 		return m, m.editor.Init()
 	case key.Matches(msg, m.keys.Edit):
@@ -259,7 +267,7 @@ func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			def = &d
 		}
 		m.err = nil
-		m.editor = newEditEditor(p.Name, def, p.Value)
+		m.editor = newEditEditor(p.Name, def, p.Value, availableRows(m.height))
 		m.screen = screenEdit
 		return m, m.editor.Init()
 	case key.Matches(msg, m.keys.Delete):
@@ -390,13 +398,22 @@ func (m *singleRepoModel) viewList() string {
 
 	if len(m.properties) == 0 {
 		b.WriteString(dimStyle.Render("(no custom properties set)") + "\n")
-	}
-	for i, p := range m.properties {
-		line := fmt.Sprintf("%-30s %s", p.Name, formatValue(p.Value))
-		if i == m.cursor {
-			b.WriteString(cursorStyle.Render("> ") + selectedStyle.Render(line) + "\n")
-		} else {
-			b.WriteString("  " + line + "\n")
+	} else {
+		start, end := visibleWindow(len(m.properties), m.cursor, availableRows(m.height))
+		if start > 0 {
+			b.WriteString(dimStyle.Render(fmt.Sprintf("  ↑ %d more above", start)) + "\n")
+		}
+		for i := start; i < end; i++ {
+			p := m.properties[i]
+			line := fmt.Sprintf("%-30s %s", p.Name, formatValue(p.Value))
+			if i == m.cursor {
+				b.WriteString(cursorStyle.Render("> ") + selectedStyle.Render(line) + "\n")
+			} else {
+				b.WriteString("  " + line + "\n")
+			}
+		}
+		if end < len(m.properties) {
+			b.WriteString(dimStyle.Render(fmt.Sprintf("  ↓ %d more below", len(m.properties)-end)) + "\n")
 		}
 	}
 

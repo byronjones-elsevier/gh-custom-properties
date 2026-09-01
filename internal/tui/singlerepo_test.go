@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -16,6 +17,66 @@ func newLoadedModel(t *testing.T, props []ghclient.PropertyValue, schema []ghcli
 }
 
 func runeKey(r rune) tea.KeyMsg { return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}} }
+
+func manyProperties(n int) []ghclient.PropertyValue {
+	props := make([]ghclient.PropertyValue, n)
+	for i := range props {
+		props[i] = ghclient.PropertyValue{Name: fmt.Sprintf("prop-%02d", i), Value: "v"}
+	}
+	return props
+}
+
+func TestSingleRepoModel_PropertyListScrollsWhenTerminalIsShort(t *testing.T) {
+	m := newLoadedModel(t, manyProperties(40), nil, ghclient.ErrSchemaUnavailable)
+
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = next.(*singleRepoModel)
+
+	view := m.View()
+	if !strings.Contains(view, "more below") {
+		t.Errorf("expected a scroll-down indicator with 40 properties in a 20-row terminal:\n%s", view)
+	}
+	if strings.Contains(view, "prop-39") {
+		t.Errorf("last property should be scrolled out of view initially:\n%s", view)
+	}
+
+	for i := 0; i < 39; i++ {
+		next, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = next.(*singleRepoModel)
+	}
+	view = m.View()
+	if !strings.Contains(view, "more above") {
+		t.Errorf("expected a scroll-up indicator once cursor reaches the last property:\n%s", view)
+	}
+	if !strings.Contains(view, "prop-39") {
+		t.Errorf("last property should be visible once the cursor reaches it:\n%s", view)
+	}
+}
+
+func TestSingleRepoModel_OptionPickerScrollsWhenTerminalIsShort(t *testing.T) {
+	allowed := make([]string, 40)
+	for i := range allowed {
+		allowed[i] = fmt.Sprintf("option-%02d", i)
+	}
+	schema := []ghclient.PropertyDefinition{{Name: "TechOrgGroup", Type: ghclient.PropertyTypeSingleSelect, AllowedValues: allowed}}
+	m := newLoadedModel(t, nil, schema, nil)
+
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = next.(*singleRepoModel)
+
+	next, _ = m.Update(runeKey('a'))
+	m = next.(*singleRepoModel)
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // pick the only candidate name
+	m = next.(*singleRepoModel)
+
+	view := m.View()
+	if !strings.Contains(view, "more below") {
+		t.Errorf("expected the value picker to scroll with 40 allowed values in a 20-row terminal:\n%s", view)
+	}
+	if strings.Contains(view, "option-39") {
+		t.Errorf("last option should be scrolled out of view initially:\n%s", view)
+	}
+}
 
 func TestSingleRepoModel_HeaderShownOnEveryScreen(t *testing.T) {
 	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "team", Value: "platform"}}, nil, ghclient.ErrSchemaUnavailable)

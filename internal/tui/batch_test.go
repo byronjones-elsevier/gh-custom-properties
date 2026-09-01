@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -19,6 +20,41 @@ func newTableModel(t *testing.T, api *fakeAPI, rows []repoRow, schemaByOrg map[s
 	m.chunksTotal = 1
 	next, _ := m.handleChunk(batchChunkMsg{rows: rows, schemas: schemaByOrg})
 	return next.(*batchModel)
+}
+
+func manyRows(n int) []repoRow {
+	rows := make([]repoRow, n)
+	for i := range rows {
+		rows[i] = repoRow{owner: "acme", repo: fmt.Sprintf("repo-%02d", i)}
+	}
+	return rows
+}
+
+func TestBatchModel_TableScrollsWhenTerminalIsShort(t *testing.T) {
+	m := newTableModel(t, &fakeAPI{}, manyRows(40), nil)
+
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = next.(*batchModel)
+
+	view := m.View()
+	if !strings.Contains(view, "more below") {
+		t.Errorf("expected a scroll-down indicator with 40 rows in a 20-row terminal:\n%s", view)
+	}
+	if strings.Contains(view, "repo-39") {
+		t.Errorf("last row should be scrolled out of view initially:\n%s", view)
+	}
+
+	for i := 0; i < 39; i++ {
+		next, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = next.(*batchModel)
+	}
+	view = m.View()
+	if !strings.Contains(view, "more above") {
+		t.Errorf("expected a scroll-up indicator once cursor reaches the last row:\n%s", view)
+	}
+	if !strings.Contains(view, "repo-39") {
+		t.Errorf("last row should be visible once the cursor reaches it:\n%s", view)
+	}
 }
 
 func TestBatchModel_HeaderShowsOrgAndCount(t *testing.T) {

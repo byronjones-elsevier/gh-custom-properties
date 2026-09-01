@@ -47,13 +47,17 @@ type valueEditor struct {
 	stringInput   textinput.Model
 	picker        *optionPicker
 	validationErr error // set when the string input fails a knownprops format check
+
+	maxVisible int // 0 = unbounded; otherwise applied to namePicker/picker so long option lists scroll
 }
 
 // newAddEditor starts an editor for adding a new property. candidates is the
 // set of schema-defined property names not already set on the repo; it is
 // ignored (and freeform name entry used instead) when freeform is true.
-func newAddEditor(candidates []ghclient.PropertyDefinition, freeform bool) *valueEditor {
-	e := &valueEditor{isAdd: true, step: stepName, freeformName: freeform, nameCandidates: candidates}
+// maxVisible bounds how many options a name/value picker shows at once
+// before scrolling (0 = unbounded), sized to the terminal by the caller.
+func newAddEditor(candidates []ghclient.PropertyDefinition, freeform bool, maxVisible int) *valueEditor {
+	e := &valueEditor{isAdd: true, step: stepName, freeformName: freeform, nameCandidates: candidates, maxVisible: maxVisible}
 	if freeform {
 		e.nameInput = newTextInput(nil)
 	} else {
@@ -62,6 +66,7 @@ func newAddEditor(candidates []ghclient.PropertyDefinition, freeform bool) *valu
 			names[i] = c.Name
 		}
 		e.namePicker = newOptionPicker(names, false)
+		e.namePicker.maxVisible = maxVisible
 	}
 	return e
 }
@@ -69,8 +74,8 @@ func newAddEditor(candidates []ghclient.PropertyDefinition, freeform bool) *valu
 // newDeleteEditor starts an editor that only asks for a property name (via
 // the same schema-picker/freeform-text choice as newAddEditor) and completes
 // as soon as a name is chosen; Result().Value is always nil.
-func newDeleteEditor(candidates []ghclient.PropertyDefinition, freeform bool) *valueEditor {
-	e := newAddEditor(candidates, freeform)
+func newDeleteEditor(candidates []ghclient.PropertyDefinition, freeform bool, maxVisible int) *valueEditor {
+	e := newAddEditor(candidates, freeform, maxVisible)
 	e.deleteMode = true
 	return e
 }
@@ -78,8 +83,8 @@ func newDeleteEditor(candidates []ghclient.PropertyDefinition, freeform bool) *v
 // newEditEditor starts an editor for an existing property's value. def is
 // nil when the property isn't described by the org schema, in which case
 // the value is edited as freeform text.
-func newEditEditor(name string, def *ghclient.PropertyDefinition, current any) *valueEditor {
-	e := &valueEditor{isAdd: false, step: stepValue, name: name, def: def}
+func newEditEditor(name string, def *ghclient.PropertyDefinition, current any, maxVisible int) *valueEditor {
+	e := &valueEditor{isAdd: false, step: stepValue, name: name, def: def, maxVisible: maxVisible}
 	e.initValueStep(current)
 	return e
 }
@@ -92,16 +97,19 @@ func (e *valueEditor) initValueStep(current any) {
 	switch e.def.Type {
 	case ghclient.PropertyTypeSingleSelect:
 		e.picker = newOptionPicker(e.def.AllowedValues, false)
+		e.picker.maxVisible = e.maxVisible
 		if s, ok := current.(string); ok {
 			e.picker.preselectSingle(s)
 		}
 	case ghclient.PropertyTypeMultiSelect:
 		e.picker = newOptionPicker(e.def.AllowedValues, true)
+		e.picker.maxVisible = e.maxVisible
 		if ss, ok := current.([]string); ok {
 			e.picker.preselectMulti(ss)
 		}
 	case ghclient.PropertyTypeTrueFalse:
 		e.picker = newOptionPicker([]string{"true", "false"}, false)
+		e.picker.maxVisible = e.maxVisible
 		if s, ok := current.(string); ok {
 			e.picker.preselectSingle(s)
 		}
@@ -122,6 +130,18 @@ func newTextInput(current any) textinput.Model {
 
 func (e *valueEditor) Init() tea.Cmd {
 	return textinput.Blink
+}
+
+// setMaxVisible updates how many options a name/value picker shows at once,
+// e.g. in response to a terminal resize while the editor is open.
+func (e *valueEditor) setMaxVisible(n int) {
+	e.maxVisible = n
+	if e.namePicker != nil {
+		e.namePicker.maxVisible = n
+	}
+	if e.picker != nil {
+		e.picker.maxVisible = n
+	}
 }
 
 // Update advances the editor by one message. The returned outcome tells the

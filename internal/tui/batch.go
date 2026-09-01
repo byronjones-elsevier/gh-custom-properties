@@ -97,6 +97,8 @@ type batchModel struct {
 	backupPath   string
 	backupErr    error
 
+	width, height int // last known terminal size, from tea.WindowSizeMsg
+
 	err      error
 	quitting bool
 }
@@ -170,6 +172,15 @@ func (m *batchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+		if m.editor != nil {
+			m.editor.setMaxVisible(availableRows(m.height))
+		}
+		if m.targets != nil {
+			m.targets.maxVisible = availableRows(m.height)
+		}
+		return m, nil
 	case batchChunkMsg:
 		return m.handleChunk(msg)
 	case batchAppliedMsg:
@@ -322,10 +333,11 @@ func (m *batchModel) bulkSchema() []ghclient.PropertyDefinition {
 
 func (m *batchModel) startChooseProperty() {
 	schema := m.bulkSchema()
+	maxVisible := availableRows(m.height)
 	if m.action == bulkDelete {
-		m.editor = newDeleteEditor(schema, schema == nil)
+		m.editor = newDeleteEditor(schema, schema == nil, maxVisible)
 	} else {
-		m.editor = newAddEditor(schema, schema == nil)
+		m.editor = newAddEditor(schema, schema == nil, maxVisible)
 	}
 	m.screen = bScreenChooseProperty
 }
@@ -342,6 +354,7 @@ func (m *batchModel) startChooseTargets(result ghclient.PropertyValue) {
 		m.targetRow = append(m.targetRow, i)
 	}
 	m.targets = newOptionPicker(labels, true)
+	m.targets.maxVisible = availableRows(m.height)
 	for i := range labels {
 		m.targets.checked[i] = true
 	}
@@ -553,7 +566,12 @@ func (m *batchModel) viewTable() string {
 		b.WriteString(warnStyle.Render(fmt.Sprintf("%d line(s) in the repo list could not be parsed and were skipped", len(m.skipped))) + "\n\n")
 	}
 
-	for i, r := range m.rows {
+	start, end := visibleWindow(len(m.rows), m.cursor, availableRows(m.height))
+	if start > 0 {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  ↑ %d more above", start)) + "\n")
+	}
+	for i := start; i < end; i++ {
+		r := m.rows[i]
 		var line string
 		switch {
 		case r.err != nil:
@@ -568,6 +586,9 @@ func (m *batchModel) viewTable() string {
 		} else {
 			b.WriteString("  " + line + "\n")
 		}
+	}
+	if end < len(m.rows) {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  ↓ %d more below", len(m.rows)-end)) + "\n")
 	}
 
 	if m.err != nil {

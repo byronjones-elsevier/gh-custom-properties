@@ -1,14 +1,18 @@
 package tui
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // optionPicker is a small cursor-driven list used for single/multi-select
 // value editing and for picking an org-schema property name to add.
 type optionPicker struct {
-	options []string
-	cursor  int
-	multi   bool
-	checked map[int]bool
+	options    []string
+	cursor     int
+	multi      bool
+	checked    map[int]bool
+	maxVisible int // 0 = show every option; otherwise scroll to keep cursor in view
 }
 
 func newOptionPicker(options []string, multi bool) *optionPicker {
@@ -72,8 +76,14 @@ func (p *optionPicker) selectedValues() []string {
 }
 
 func (p *optionPicker) View() string {
+	start, end := visibleWindow(len(p.options), p.cursor, p.maxVisible)
+
 	var b strings.Builder
-	for i, o := range p.options {
+	if start > 0 {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  ↑ %d more above", start)) + "\n")
+	}
+	for i := start; i < end; i++ {
+		o := p.options[i]
 		prefix := "  "
 		label := o
 		if p.multi {
@@ -88,6 +98,9 @@ func (p *optionPicker) View() string {
 			label = selectedStyle.Render(label)
 		}
 		b.WriteString(prefix + label + "\n")
+	}
+	if end < len(p.options) {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  ↓ %d more below", len(p.options)-end)) + "\n")
 	}
 	return b.String()
 }

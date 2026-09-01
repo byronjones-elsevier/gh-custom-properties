@@ -16,6 +16,9 @@ internal/
   knownprops/             Elsevier-specific format validators (email/date/
                           alphanumeric) for string-typed properties, keyed
                           by property name
+  termkeys/               optional Kitty-keyboard-protocol detection, so
+                          Alt+letter commands work where the terminal
+                          supports it (see "Alt-key commands" below)
   tui/                    Bubble Tea models: single-repo flow, batch flow,
                           shared type-aware value editor
 docs/
@@ -85,8 +88,9 @@ unmarshaling, so nothing downstream has to deal with `[]any`.
 ## TUI structure
 
 `internal/tui/app.go`'s `App` is a thin router: it holds one `innerModel`
-(either `*singleRepoModel` or `*batchModel`, both satisfying `tea.Model`
-plus a `Quitting() bool` escape hatch) and delegates `Init`/`Update`/`View`.
+(either `*singleRepoModel` or `*batchModel`, both satisfying `tea.Model`)
+and delegates `Init`/`Update`/`View`, layering global concerns on top —
+see "App-level overlays" below.
 
 Both flows share `valueEditor` (`internal/tui/valueeditor.go`), a type-aware
 widget with two steps: pick a name (from the org schema, or freeform text
@@ -94,6 +98,40 @@ if the schema is unavailable), then edit the value with a widget matching
 the property's type (text input, single-select list, multi-select
 checklist). `newDeleteEditor` reuses the same name-picking step but
 short-circuits after it, since deleting only needs a name.
+
+### App-level overlays: quit-confirm, help, minimum size
+
+`App` tracks `overlay overlayKind` (`none`/`quitConfirm`/`help`) and its own
+`width, height`. `ctrl+c`/`ctrl+q` are intercepted directly in `App.Update`
+before ever reaching the inner model; bare `q` can't be intercepted the
+same way (it must stay scoped to screens with no active text input, or
+typing a "q" into a repo name/property value would quit instead), so the
+inner models emit a `quitRequestedMsg{}` via a returned `tea.Cmd` instead —
+cmd-produced messages route back through `App.Update` before the inner
+model ever sees them again, the same mechanism `loadedMsg`/`appliedMsg`
+already rely on, so `App` can gate it behind the same confirmation. While
+`overlay != none`, `App.Update` swallows `KeyMsg`s itself (`y`/`enter`
+confirms quit, anything else cancels) but still forwards non-`KeyMsg`
+messages to the inner model, so a fetch that's still in flight isn't
+frozen by the overlay. `F1` sets `overlay = help` from any screen,
+rendering a static keybinding reference (`internal/tui/help.go`) instead of
+the CLI's `-h` text (which documents flags, not in-TUI usage). Below
+`minWidth`/`minHeight`, `App.View` shows a resize warning instead of either
+model's view.
+
+The single-repo result screen's "press any key to continue" stays an
+immediate, unconfirmed quit — that's a deliberate dismissal after work is
+already saved (or a failure already reported), not an accidental
+interrupt, so gating it behind the same confirm would just add friction.
+
+### Config-driven color palette
+
+`internal/tui/styles.go`'s style `var`s are `(re)`built by `ApplyPalette`
+from a `Palette` (plain `tui`-local type, not `config.Palette`, so this
+package doesn't need to know about config loading) — called once in
+`main.go` right after `config.Load`. `internal/config/palette.go` reads
+optional `color_*` keys from the config file on top of
+`defaultPalette()`, which matches the values this app has always used.
 
 ### Window size and scrolling
 
@@ -111,6 +149,76 @@ target picker) — anywhere a list's length isn't bounded by the data model.
 state before the first `WindowSizeMsg` arrives (e.g. in tests that
 construct a model directly without sending one).
 
+### Paging
+
+`internal/tui/scroll.go`'s `pageSize(maxVisible)` returns a full visible
+window (falling back to `defaultPageSize` when unbounded), and
+`isPageUpKey`/`isPageDownKey` recognize PgUp/PgDn, F7/F8, and
+Shift-Up/Shift-Down. `optionPicker.pageUp`/`pageDown` and the equivalent
+inline cursor math in the property list and repo table all move by that
+amount, clamping at both ends.
+
+### "?" filtering
+
+`optionPicker.cursor` indexes into a computed `visibleIndices()` — every
+option index when there's no filter, otherwise only those matching it via
+the shared `filterIndices` helper — rather than into `options` directly;
+`checked` stays keyed by the raw option index so it survives a filter
+change. `singleRepoModel`/`batchModel` carry their own `filter`/`filtering`
+fields and the same Esc/`?`/rune-forwarding logic for the property list and
+repo table, since their underlying data isn't `[]string`. Enter while
+actively typing (`filtering == true`) locks the filter in rather than
+confirming the outer selection or toggling a checkbox — needed since Space
+would otherwise be ambiguous between "type a space into the filter" and
+"toggle the current multi-select item." Esc clears an active filter first;
+only once nothing is filtered does it fall through to its normal
+cancel/back meaning.
+
+### Flash-on-keypress
+
+`singleRepoModel`/`batchModel` defer a hub screen's command key (`a`/`e`/
+`d`/`s`/`q` on the property list, `b`/`q` on the repo table) via
+`pendingFlash{label, action}` and a `flashTick()` (100ms), instead of
+running the action immediately — the footer highlights the matching
+segment (`helpLineFlash`, `flashStyle`) while it's pending, then
+`flashElapsedMsg` fires the stored `action`. Scoped to these two hub
+screens only; sub-screens (editors, confirm dialogs) are lower-frequency
+interactions where the added delay would cost more than it's worth.
+`helpLine`'s segments are styled individually and joined unstyled, rather
+than wrapping the whole joined string in one `Render` call — nesting a
+differently-styled flash segment inside an outer `Render` would have its
+ANSI reset code kill the outer style for everything after it.
+
+### Bottom-pinned footer
+
+The property list and repo table split their render into content and a
+separate `footer` return value (`viewListParts`/`viewTableParts`, mirroring
+the `header()` method already used for the org/repo banner);
+`pinFooter(content, footer, height)` (`internal/tui/scroll.go`) pads
+between them with blank lines up to the known terminal height, so the
+footer lands on the last row instead of floating wherever the content ends.
+Scoped to these two hub screens for the same reason as flash-on-keypress —
+sub-screens are short enough that pinning adds little.
+
+### Alt-key commands
+
+TUI.md calls for every custom command to also be reachable via
+`Alt-<letter>`. Cmd is unreachable from a terminal program (consumed by the
+terminal emulator itself), and Option/Alt needs either the Kitty keyboard
+protocol or a manually-enabled "Use Option as Meta Key" setting — neither
+of which macOS's default Terminal.app has — so `internal/termkeys` probes
+for Kitty protocol support once at startup (`main.go`, strictly *before*
+`tea.Program.Run()`, since the probe does its own raw-mode `stdin` read
+that would race with Bubble Tea's input loop if run concurrently) and asks
+the terminal to enable disambiguated reporting if found. Every custom
+command's `key.Binding` matches `alt+<letter>` *unconditionally* —
+registering it doesn't depend on detection succeeding, since an
+unsupported combination simply never arrives as a `KeyMsg`. This means Alt
+shortcuts work automatically on Kitty-protocol terminals and on any
+terminal where the user has already enabled Option-as-Meta, while the bare
+letter — the only thing that reliably works everywhere, including default
+Terminal.app — never regresses.
+
 Batch mode fetches and applies with a bounded worker pool (8 by default,
 `batchFetchWorkers`/`batchApplyWorkers` in `internal/tui/batch.go`) rather
 than one goroutine per repo, so a large `--file` doesn't open hundreds of
@@ -122,7 +230,10 @@ of targets before any patch goes out.
 
 State-transition tests for both flows live in `internal/tui/singlerepo_test.go`
 and `internal/tui/batch_test.go`, calling `Update` directly with synthetic
-`tea.KeyMsg`/message values against the `fakeAPI`.
+`tea.KeyMsg`/message values against the `fakeAPI`. Since hub-screen command
+keys now defer via `pendingFlash` (see "Flash-on-keypress"), tests use a
+`settle`/`settleBatch` helper that feeds a `flashElapsedMsg` directly
+rather than waiting out the real 100ms `flashDuration`.
 
 ## Known scope limits
 
@@ -134,3 +245,12 @@ and `internal/tui/batch_test.go`, calling `Update` directly with synthetic
 - There's no dedicated "retry failed" action after a batch apply; rerun the
   bulk edit and use the target picker (`a`/`n`/`space`) to select just the
   repos that failed.
+- Single-repo `F5` discards any staged-but-unapplied add/edit/delete
+  without a confirmation prompt (browser-refresh semantics). Batch mode has
+  no staging concept — bulk edits apply immediately — so its `F5` is
+  loss-free.
+- `internal/termkeys`'s Kitty-protocol probe spawns a goroutine to read
+  `stdin` with a 100ms timeout; if the terminal never replies, that
+  goroutine blocks on the read for the life of the process. Harmless (one
+  goroutine, cleaned up on exit) but worth knowing if it ever shows up in a
+  goroutine dump.

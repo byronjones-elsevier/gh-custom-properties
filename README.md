@@ -53,11 +53,15 @@ Within the single-repo screen:
 | Key | Action |
 |---|---|
 | `↑`/`↓` or `j`/`k` | move selection |
+| `pgup`/`pgdn`, `f7`/`f8`, `shift+↑`/`shift+↓` | page through a long list |
 | `a` | add a property (from the org schema, or freeform if unavailable) |
 | `enter`/`e` | edit the selected property's value |
 | `d` | delete the selected property (confirm with `y`) |
 | `s` | apply all changes (writes a backup first, then patches GitHub) |
-| `q` | quit |
+| `?` | filter the list by name (typing narrows it live; `esc` clears) |
+| `q` | quit (confirm with `y`/`enter`; any other key cancels) |
+
+See [Global keybindings](#global-keybindings) below for `F1`/`F5`/Ctrl-C/Ctrl-Q, which work on every screen.
 
 Batch mode, across a list of repos:
 
@@ -87,6 +91,33 @@ bulk-edit property picker is built from the first successfully loaded
 repo's org schema. If a repo in a different org doesn't recognize the
 chosen property, that repo's apply result will show the API error rather
 than being silently skipped.
+
+On the repo table: `↑`/`↓`/`j`/`k` and paging move the selection, `?`
+filters the table by `owner/repo`, `b` starts a bulk edit, `F5` re-fetches
+every repo from GitHub (discarding nothing — batch mode never stages
+unapplied edits), and `q` quits.
+
+## Global keybindings
+
+These work on every screen, in both modes:
+
+| Key | Action |
+|---|---|
+| `F1` | show/close a keybinding reference |
+| `F5` | refresh from GitHub (property list / repo table only) |
+| `ctrl+c` / `ctrl+q` / `q`\* | quit — asks to confirm; a second press (or `y`/`enter`) confirms, any other key cancels |
+| `tab` | in the add/edit editor, same as `enter` (confirm/advance) |
+| `shift+tab` | in the add editor's value step, go back and pick a different property |
+
+\* `q` only means quit on the property list / repo table screens — elsewhere (e.g. typing a repo name or a property value) it's just the letter q. `ctrl+q` is intercepted by some terminals for flow control; `ctrl+c` is the more universally reliable path.
+
+Every custom command above (`a`/`e`/`d`/`s`/`q`/`b`) also matches
+`alt+<letter>`, honoring the equivalent of the common "Alt-key shortcut"
+terminal convention. This only does something on terminals that support
+the [Kitty keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/)
+(kitty, WezTerm, Ghostty, newer iTerm2 builds) or that have "Use Option as
+Meta Key" enabled — notably **not** macOS's default Terminal.app — so the
+bare letter is always there as the reliable fallback.
 
 ## Backups
 
@@ -143,6 +174,24 @@ each overriding the last:
 backup_dir=/some/path
 token=ghp_...
 ```
+
+The color theme is config-file-only (no env/flag override), and falls back
+to the built-in defaults for anything unset:
+
+```
+color_title=212      # screen titles
+color_header=39      # the persistent owner/repo (or org — N repo(s)) banner
+color_cursor=212      # the selected row's cursor
+color_selected=212    # the selected row's text
+color_dim=240         # secondary text (scroll indicators, "(unset)", filter box)
+color_error=203       # error messages
+color_success=42      # success messages
+color_warn=214        # warnings (e.g. org schema unavailable)
+color_help=240        # footer key hints
+```
+
+Values are lipgloss color specs: an ANSI 256 color number (`"212"`) or a
+hex code (`"#ff69b4"`).
 
 ## Development
 

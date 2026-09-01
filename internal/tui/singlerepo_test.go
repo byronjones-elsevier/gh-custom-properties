@@ -77,6 +77,33 @@ func TestSingleRepoModel_EditSaveUpdatesValue(t *testing.T) {
 	}
 }
 
+func TestSingleRepoModel_EditRejectsInvalidKnownFormat(t *testing.T) {
+	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "owner", Value: "b.jones1@elsevier.com"}}, nil, ghclient.ErrSchemaUnavailable)
+
+	next, _ := m.Update(runeKey('e'))
+	m = next.(*singleRepoModel)
+
+	m.editor.stringInput.SetValue("not-an-email")
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = next.(*singleRepoModel)
+	if m.screen != screenEdit || m.editor == nil || m.editor.validationErr == nil {
+		t.Fatalf("after enter with invalid email: screen=%v editor=%v, want still screenEdit with a validation error", m.screen, m.editor)
+	}
+	if m.properties[0].Value != "b.jones1@elsevier.com" {
+		t.Errorf("value changed despite invalid input: %v", m.properties[0].Value)
+	}
+
+	m.editor.stringInput.SetValue("new.owner@elsevier.com")
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = next.(*singleRepoModel)
+	if m.screen != screenList || m.editor != nil {
+		t.Fatalf("after enter with a valid email: screen=%v editor=%v, want screenList with no editor", m.screen, m.editor)
+	}
+	if m.properties[0].Value != "new.owner@elsevier.com" {
+		t.Errorf("properties[0].Value = %v, want the new valid email", m.properties[0].Value)
+	}
+}
+
 func TestSingleRepoModel_AddWithSchema(t *testing.T) {
 	schema := []ghclient.PropertyDefinition{
 		{Name: "tier", Type: ghclient.PropertyTypeSingleSelect, AllowedValues: []string{"1", "2", "3"}},

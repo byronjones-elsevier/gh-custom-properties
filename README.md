@@ -112,6 +112,27 @@ the change is not applied.
 }
 ```
 
+## Elsevier standard properties
+
+Dropdown-style properties (`MigrationReady`, `ReviewComplete`, `SystemType`,
+`TargetOrg`, `TechOrg`, `TechOrgGroup`, ...) always get their allowed values
+live from the org's schema (`GET /orgs/{org}/properties/schema`) — nothing
+is hardcoded, so the dropdown list can't go stale.
+
+GitHub's schema only knows a property is `string`, though, not that it
+should look like an email address or a date. For Elsevier's standard
+string-typed properties, gh-custom-properties adds that format validation
+client-side (`internal/knownprops`), rejecting the value (with an inline
+error) until it's fixed:
+
+| Property | Required format |
+|---|---|
+| `CostCode` | alphanumeric |
+| `SystemID` | alphanumeric |
+| `SystemName` | alphanumeric |
+| `owner` | email address |
+| `MigrationReadyDate` | `YYYY-MM-DD` |
+
 ## Configuration
 
 Settings load from `$HOME/.gh-custom-properties/config` (a plain

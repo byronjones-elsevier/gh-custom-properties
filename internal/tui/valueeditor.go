@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/ghclient"
+	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/knownprops"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -43,8 +44,9 @@ type valueEditor struct {
 	name string
 	def  *ghclient.PropertyDefinition // nil => freeform string value
 
-	stringInput textinput.Model
-	picker      *optionPicker
+	stringInput   textinput.Model
+	picker        *optionPicker
+	validationErr error // set when the string input fails a knownprops format check
 }
 
 // newAddEditor starts an editor for adding a new property. candidates is the
@@ -213,8 +215,16 @@ func (e *valueEditor) updateValueStep(keyMsg tea.KeyMsg) (tea.Cmd, editorOutcome
 	}
 
 	if keyMsg.Type == tea.KeyEnter {
+		if kind, ok := knownprops.Validators[e.name]; ok {
+			if err := knownprops.Validate(kind, e.stringInput.Value()); err != nil {
+				e.validationErr = err
+				return nil, outcomeNone
+			}
+		}
+		e.validationErr = nil
 		return nil, outcomeDone
 	}
+	e.validationErr = nil
 	var cmd tea.Cmd
 	e.stringInput, cmd = e.stringInput.Update(keyMsg)
 	return cmd, outcomeNone
@@ -286,6 +296,9 @@ func (e *valueEditor) View() string {
 		))
 	default:
 		b.WriteString("Value: " + e.stringInput.View() + "\n")
+		if e.validationErr != nil {
+			b.WriteString(errorStyle.Render(e.validationErr.Error()) + "\n")
+		}
 		b.WriteString("\n" + helpLine(
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "confirm")),
 			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),

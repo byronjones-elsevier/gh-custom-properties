@@ -13,6 +13,9 @@ internal/
                           dependency — 3 endpoints, plain net/http)
   backup/                 timestamped JSON snapshot writer
   repolist/               parses --file (one owner/repo or URL per line)
+  knownprops/             Elsevier-specific format validators (email/date/
+                          alphanumeric) for string-typed properties, keyed
+                          by property name
   tui/                    Bubble Tea models: single-repo flow, batch flow,
                           shared type-aware value editor
 docs/
@@ -41,6 +44,22 @@ single-repo apply and the batch bulk-apply send only the properties that
 actually changed — single-repo mode sends its whole in-memory working set
 (harmless: re-setting an unchanged value to itself is a no-op), batch mode
 sends exactly the one property being bulk-set or -deleted.
+
+### Why the standard property catalog isn't hardcoded
+
+Elsevier's `single_select` custom properties (`MigrationReady`,
+`SystemType`, `TargetOrg`, `TechOrg`, `TechOrgGroup`, ...) are already
+available, live, from `GetOrgSchema` — deliberately not duplicated as a
+static fallback list. A live check against `elsevierPTG`'s real schema
+during development turned up several differences from a hand-typed
+reference list of the same properties (e.g. "Researcher Products" vs.
+"Research Products", "TIO Data Engineering" vs. "TIO Date Engineering",
+"Incident Response" vs. "Incident Management" in `TechOrgGroup`'s allowed
+values) — exactly the staleness risk a hardcoded copy would reintroduce.
+`internal/knownprops` only covers what the live schema genuinely can't
+express: format validation for the `string`-typed properties (email, date,
+alphanumeric). Adding a new Elsevier standard `single_select` property
+needs no code change here — it just needs to exist in the org's schema.
 
 `ghclient.PropertiesAPI` is the interface the TUI depends on instead of the
 concrete `*Client`; tests use a hand-rolled fake (`internal/tui/fake_api_test.go`)

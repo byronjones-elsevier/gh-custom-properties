@@ -127,6 +127,35 @@ func TestSingleRepoModel_PageDownAndUp(t *testing.T) {
 	}
 }
 
+func TestSingleRepoModel_TabAdvancesAndShiftTabGoesBack(t *testing.T) {
+	schema := []ghclient.PropertyDefinition{
+		{Name: "tier", Type: ghclient.PropertyTypeSingleSelect, AllowedValues: []string{"1", "2", "3"}},
+	}
+	m := newLoadedModel(t, nil, schema, nil)
+
+	next, _ := m.Update(runeKey('a'))
+	m = next.(*singleRepoModel)
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab}) // tab picks the only candidate name, like enter
+	m = next.(*singleRepoModel)
+	if m.editor.step != stepValue {
+		t.Fatalf("after tab on name step: step=%v, want stepValue", m.editor.step)
+	}
+
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyShiftTab}) // shift+tab returns to the name step
+	m = next.(*singleRepoModel)
+	if m.editor.step != stepName {
+		t.Fatalf("after shift+tab: step=%v, want stepName", m.editor.step)
+	}
+
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // re-confirm the name
+	m = next.(*singleRepoModel)
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab}) // tab confirms the value, like enter
+	m = next.(*singleRepoModel)
+	if m.screen != screenList || len(m.properties) != 1 {
+		t.Fatalf("after tab on value step: screen=%v properties=%v", m.screen, m.properties)
+	}
+}
+
 func TestSingleRepoModel_HeaderShownOnEveryScreen(t *testing.T) {
 	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "team", Value: "platform"}}, nil, ghclient.ErrSchemaUnavailable)
 	const want = "octocat/hello-world"

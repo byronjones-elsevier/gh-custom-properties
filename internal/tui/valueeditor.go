@@ -177,7 +177,7 @@ func (e *valueEditor) forwardToActiveInput(msg tea.Msg) tea.Cmd {
 
 func (e *valueEditor) updateNameStep(keyMsg tea.KeyMsg) (tea.Cmd, editorOutcome) {
 	if e.freeformName {
-		if keyMsg.Type == tea.KeyEnter {
+		if keyMsg.Type == tea.KeyEnter || keyMsg.String() == "tab" {
 			name := strings.TrimSpace(e.nameInput.Value())
 			if name == "" {
 				return nil, outcomeNone
@@ -204,7 +204,7 @@ func (e *valueEditor) updateNameStep(keyMsg tea.KeyMsg) (tea.Cmd, editorOutcome)
 		e.namePicker.pageUp()
 	case isPageDownKey(s):
 		e.namePicker.pageDown()
-	case s == "enter":
+	case s == "enter" || s == "tab":
 		if e.namePicker.cursor < 0 || e.namePicker.cursor >= len(e.nameCandidates) {
 			return nil, outcomeNone
 		}
@@ -222,6 +222,11 @@ func (e *valueEditor) updateNameStep(keyMsg tea.KeyMsg) (tea.Cmd, editorOutcome)
 }
 
 func (e *valueEditor) updateValueStep(keyMsg tea.KeyMsg) (tea.Cmd, editorOutcome) {
+	if keyMsg.String() == "shift+tab" {
+		e.backToNameStep()
+		return textinput.Blink, outcomeNone
+	}
+
 	if e.picker != nil {
 		switch s := keyMsg.String(); {
 		case s == "up" || s == "k":
@@ -236,13 +241,13 @@ func (e *valueEditor) updateValueStep(keyMsg tea.KeyMsg) (tea.Cmd, editorOutcome
 			if e.picker.multi {
 				e.picker.toggle()
 			}
-		case s == "enter":
+		case s == "enter" || s == "tab":
 			return nil, outcomeDone
 		}
 		return nil, outcomeNone
 	}
 
-	if keyMsg.Type == tea.KeyEnter {
+	if keyMsg.Type == tea.KeyEnter || keyMsg.String() == "tab" {
 		if kind, ok := knownprops.Validators[e.name]; ok {
 			if err := knownprops.Validate(kind, e.stringInput.Value()); err != nil {
 				e.validationErr = err
@@ -256,6 +261,22 @@ func (e *valueEditor) updateValueStep(keyMsg tea.KeyMsg) (tea.Cmd, editorOutcome
 	var cmd tea.Cmd
 	e.stringInput, cmd = e.stringInput.Update(keyMsg)
 	return cmd, outcomeNone
+}
+
+// backToNameStep returns from the value step to the name step, only
+// meaningful when adding a new property (there's a name step to go back
+// to — editing an existing property's value has none, so this is a no-op).
+// The name picker/input keeps whatever the user had already entered; only
+// the value-step picker is cleared, since it's rebuilt fresh once the name
+// is (re)confirmed — which also means the user can pick a different
+// property to add, not just retype the same one's value.
+func (e *valueEditor) backToNameStep() {
+	if !e.isAdd {
+		return
+	}
+	e.step = stepName
+	e.picker = nil
+	e.validationErr = nil
 }
 
 // Result returns the property name/value pair the user configured. Only

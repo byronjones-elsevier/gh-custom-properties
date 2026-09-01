@@ -331,25 +331,38 @@ func (m *singleRepoModel) upsertProperty(v ghclient.PropertyValue) {
 	sort.Slice(m.properties, func(i, j int) bool { return m.properties[i].Name < m.properties[j].Name })
 }
 
+// header returns the persistent "owner/repo" banner shown at the top of
+// every screen once a repo has been chosen (i.e. every screen but the
+// initial repo-input prompt, where there's nothing to show yet).
+func (m *singleRepoModel) header() string {
+	if m.owner == "" || m.repo == "" {
+		return ""
+	}
+	return renderHeader(m.owner + "/" + m.repo)
+}
+
 func (m *singleRepoModel) View() string {
+	return boxStyle.Render(m.header() + m.viewBody())
+}
+
+func (m *singleRepoModel) viewBody() string {
 	switch m.screen {
 	case screenInput:
 		return m.viewInput()
 	case screenLoading:
-		return fmt.Sprintf("\n  %s Loading %s/%s...\n", m.spin.View(), m.owner, m.repo)
+		return fmt.Sprintf("\n  %s Loading properties...\n", m.spin.View())
 	case screenList:
 		return m.viewList()
 	case screenEdit:
-		return boxStyle.Render(m.editor.View())
+		return m.editor.View()
 	case screenConfirmDelete:
 		name := m.properties[m.pendingDeleteAt].Name
-		return boxStyle.Render(warnStyle.Render(fmt.Sprintf("Delete property %q from %s/%s?", name, m.owner, m.repo)) +
-			"\n\n" + helpLine(
+		return warnStyle.Render(fmt.Sprintf("Delete property %q?", name)) + "\n\n" + helpLine(
 			keyBinding("y", "confirm"),
 			keyBinding("n/esc", "cancel"),
-		))
+		)
 	case screenApplying:
-		return fmt.Sprintf("\n  %s Applying changes to %s/%s...\n", m.spin.View(), m.owner, m.repo)
+		return fmt.Sprintf("\n  %s Applying changes...\n", m.spin.View())
 	case screenResult:
 		return m.viewResult()
 	}
@@ -364,12 +377,12 @@ func (m *singleRepoModel) viewInput() string {
 		b.WriteString("\n" + errorStyle.Render(m.err.Error()) + "\n")
 	}
 	b.WriteString("\n" + helpLine(keyBinding("enter", "load"), keyBinding("q", "quit")))
-	return boxStyle.Render(b.String())
+	return b.String()
 }
 
 func (m *singleRepoModel) viewList() string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render(fmt.Sprintf("%s/%s custom properties", m.owner, m.repo)) + "\n\n")
+	b.WriteString(titleStyle.Render("Custom properties") + "\n\n")
 
 	if m.schema == nil {
 		b.WriteString(warnStyle.Render("org schema unavailable — editing values as freeform text") + "\n\n")
@@ -394,7 +407,7 @@ func (m *singleRepoModel) viewList() string {
 	b.WriteString("\n" + helpLine(
 		m.keys.Up, m.keys.Down, m.keys.Add, m.keys.Edit, m.keys.Delete, m.keys.Save, m.keys.Quit,
 	))
-	return boxStyle.Render(b.String())
+	return b.String()
 }
 
 func (m *singleRepoModel) viewResult() string {
@@ -405,11 +418,11 @@ func (m *singleRepoModel) viewResult() string {
 			b.WriteString(dimStyle.Render("Backup of prior values was written to "+m.backupPath) + "\n")
 		}
 	} else {
-		b.WriteString(successStyle.Render("Applied changes to "+m.owner+"/"+m.repo) + "\n")
+		b.WriteString(successStyle.Render("Applied changes") + "\n")
 		b.WriteString(dimStyle.Render("Backup of prior values: "+m.backupPath) + "\n")
 	}
 	b.WriteString("\n" + helpLine(keyBinding("any key", "quit")))
-	return boxStyle.Render(b.String())
+	return b.String()
 }
 
 func formatValue(v any) string {

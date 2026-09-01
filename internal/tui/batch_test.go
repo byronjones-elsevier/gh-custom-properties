@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/ghclient"
@@ -18,6 +19,36 @@ func newTableModel(t *testing.T, api *fakeAPI, rows []repoRow, schemaByOrg map[s
 	m.chunksTotal = 1
 	next, _ := m.handleChunk(batchChunkMsg{rows: rows, schemas: schemaByOrg})
 	return next.(*batchModel)
+}
+
+func TestBatchModel_HeaderShowsOrgAndCount(t *testing.T) {
+	api := &fakeAPI{}
+	rows := []repoRow{
+		{owner: "acme", repo: "a"},
+		{owner: "acme", repo: "b"},
+	}
+	m := newTableModel(t, api, rows, nil)
+	if !strings.Contains(m.View(), "acme — 2 repo(s)") {
+		t.Errorf("table screen View() missing org/count header:\n%s", m.View())
+	}
+
+	next, _ := m.Update(runeKey('b'))
+	m = next.(*batchModel)
+	if !strings.Contains(m.View(), "acme — 2 repo(s)") {
+		t.Errorf("choose-action screen View() missing org/count header:\n%s", m.View())
+	}
+}
+
+func TestBatchModel_HeaderNotesMixedOrgs(t *testing.T) {
+	api := &fakeAPI{}
+	rows := []repoRow{
+		{owner: "acme", repo: "a"},
+		{owner: "other-org", repo: "b"},
+	}
+	m := newTableModel(t, api, rows, nil)
+	if !strings.Contains(m.View(), "multiple orgs") {
+		t.Errorf("table screen View() should note mixed orgs:\n%s", m.View())
+	}
 }
 
 func TestBatchModel_BulkSetAcrossRepos(t *testing.T) {

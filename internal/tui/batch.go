@@ -470,7 +470,55 @@ func upsertOrDeleteProperty(props []ghclient.PropertyValue, name string, value a
 
 func (m *batchModel) Quitting() bool { return m.quitting }
 
+// header returns the persistent banner shown at the top of every screen:
+// the org the batch is drawn from (or a note that it spans multiple orgs)
+// and how many repos are involved.
+func (m *batchModel) header() string {
+	count := len(m.entries)
+	org := ownerOf(m.entries)
+	if len(m.rows) > 0 {
+		count = len(m.rows)
+		org = ownerOfRows(m.rows)
+	}
+	if org == "" {
+		return renderHeader(fmt.Sprintf("%d repo(s) — multiple orgs", count))
+	}
+	return renderHeader(fmt.Sprintf("%s — %d repo(s)", org, count))
+}
+
+// ownerOf/ownerOfRows return the common owner across entries/rows, or "" if
+// they span more than one.
+func ownerOf(entries []repolist.Entry) string {
+	if len(entries) == 0 {
+		return ""
+	}
+	org := entries[0].Owner
+	for _, e := range entries {
+		if e.Owner != org {
+			return ""
+		}
+	}
+	return org
+}
+
+func ownerOfRows(rows []repoRow) string {
+	if len(rows) == 0 {
+		return ""
+	}
+	org := rows[0].owner
+	for _, r := range rows {
+		if r.owner != org {
+			return ""
+		}
+	}
+	return org
+}
+
 func (m *batchModel) View() string {
+	return boxStyle.Render(m.header() + m.viewBody())
+}
+
+func (m *batchModel) viewBody() string {
 	switch m.screen {
 	case bScreenLoading:
 		return m.viewLoading()
@@ -479,7 +527,7 @@ func (m *batchModel) View() string {
 	case bScreenChooseAction:
 		return m.viewChooseAction()
 	case bScreenChooseProperty:
-		return boxStyle.Render(m.editor.View())
+		return m.editor.View()
 	case bScreenChooseTargets:
 		return m.viewChooseTargets()
 	case bScreenApplying:
@@ -529,7 +577,7 @@ func (m *batchModel) viewTable() string {
 	b.WriteString("\n" + helpLine(
 		keyBinding("↑/k", "up"), keyBinding("↓/j", "down"), keyBinding("b", "bulk edit"), keyBinding("q", "quit"),
 	))
-	return boxStyle.Render(b.String())
+	return b.String()
 }
 
 func summarizeProperties(props []ghclient.PropertyValue) string {
@@ -546,7 +594,7 @@ func (m *batchModel) viewChooseAction() string {
 	b.WriteString("1) Set a property across selected repos\n")
 	b.WriteString("2) Delete a property from selected repos\n")
 	b.WriteString("\n" + helpLine(keyBinding("1/2", "choose"), keyBinding("esc", "back")))
-	return boxStyle.Render(b.String())
+	return b.String()
 }
 
 func (m *batchModel) viewChooseTargets() string {
@@ -565,7 +613,7 @@ func (m *batchModel) viewChooseTargets() string {
 		keyBinding("space", "toggle"), keyBinding("a", "all"), keyBinding("n", "none"),
 		keyBinding("enter", "apply"), keyBinding("esc", "cancel"),
 	))
-	return boxStyle.Render(b.String())
+	return b.String()
 }
 
 func (m *batchModel) viewResult() string {
@@ -573,7 +621,7 @@ func (m *batchModel) viewResult() string {
 	if m.backupErr != nil {
 		b.WriteString(errorStyle.Render("Failed to write backup, no changes were applied: "+m.backupErr.Error()) + "\n")
 		b.WriteString("\n" + helpLine(keyBinding("any key", "back to repo list")))
-		return boxStyle.Render(b.String())
+		return b.String()
 	}
 
 	succeeded, failed := 0, 0
@@ -596,5 +644,5 @@ func (m *batchModel) viewResult() string {
 		}
 	}
 	b.WriteString("\n" + helpLine(keyBinding("any key", "back to repo list")))
-	return boxStyle.Render(b.String())
+	return b.String()
 }

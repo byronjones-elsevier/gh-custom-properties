@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/ghclient"
@@ -15,6 +16,36 @@ func newLoadedModel(t *testing.T, props []ghclient.PropertyValue, schema []ghcli
 }
 
 func runeKey(r rune) tea.KeyMsg { return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}} }
+
+func TestSingleRepoModel_HeaderShownOnEveryScreen(t *testing.T) {
+	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "team", Value: "platform"}}, nil, ghclient.ErrSchemaUnavailable)
+	const want = "octocat/hello-world"
+
+	if !strings.Contains(m.View(), want) {
+		t.Errorf("list screen View() missing header %q:\n%s", want, m.View())
+	}
+
+	next, _ := m.Update(runeKey('e'))
+	m = next.(*singleRepoModel)
+	if !strings.Contains(m.View(), want) {
+		t.Errorf("edit screen View() missing header %q:\n%s", want, m.View())
+	}
+
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = next.(*singleRepoModel)
+	next, _ = m.Update(runeKey('d'))
+	m = next.(*singleRepoModel)
+	if !strings.Contains(m.View(), want) {
+		t.Errorf("confirm-delete screen View() missing header %q:\n%s", want, m.View())
+	}
+}
+
+func TestSingleRepoModel_InputScreenHasNoHeader(t *testing.T) {
+	m := newSingleRepoModel(&fakeAPI{}, t.TempDir(), "", "")
+	if strings.Contains(m.View(), "─") {
+		t.Errorf("input screen View() should have no header rule yet (no repo chosen):\n%s", m.View())
+	}
+}
 
 func TestSingleRepoModel_DeleteConfirmAndCancel(t *testing.T) {
 	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "team", Value: "platform"}}, nil, ghclient.ErrSchemaUnavailable)

@@ -160,5 +160,5 @@ func parseArgs(args []string) (cliOptions, int, bool) {
 }
 
 func printUsage(w *os.File) {
-	fmt.Fprint(w, clidoc.GHCustomProperties.RenderText())
+	_, _ = fmt.Fprint(w, clidoc.GHCustomProperties.RenderText())
 }

@@ -85,7 +85,6 @@ type singleRepoModel struct {
 	loaded       []ghclient.PropertyValue // as fetched, used as the backup's "before" state
 	schema       []ghclient.PropertyDefinition
 	schemaByName map[string]ghclient.PropertyDefinition
-	schemaErr    error
 
 	cursor          int
 	filter          string // "?" starts composing this; narrows the property list to a case-insensitive substring match on name

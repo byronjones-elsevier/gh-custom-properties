@@ -28,10 +28,14 @@ Notes for an AI coding agent picking this repository back up. See
 ## Before committing
 
 ```sh
-go build ./... && go vet ./... && gofmt -l . && go test ./...
+make all   # fmt/check, vet, lint, test, build — same checks CI runs
 ```
-`gofmt -l .` must print nothing. If you touched `internal/clidoc`, also run
-`go generate ./...` and commit the regenerated `docs/` output alongside.
+`golangci-lint` needs v2.x, built against a Go toolchain at least as new as
+whatever's installed locally — an older binary can panic outright rather
+than report findings; `brew upgrade golangci-lint` (or equivalent) fixes
+that. If you touched `internal/clidoc`, also run `make docs/gen` and
+commit the regenerated `docs/*.1`/`docs/*.html` alongside — CI's `docs`
+job fails the build if they're out of sync.
 
 ## Local environment note
 
@@ -61,6 +65,9 @@ SSL_CERT_FILE="$HOME/.ssh/zscaler/zscaler.pem" go get ...
 
 ## Git workflow for this repo
 
-Single `main` branch, no PRs (no remote configured yet). Commit
-incrementally as logical pieces land, per the user's global git-hygiene
-preference — see `~/.claude/agents/CODING.md` if you have access to it.
+Private repo at `github.com/byronjones-elsevier/gh-custom-properties`
+(matches the module path case-insensitively — GitHub usernames aren't
+case-sensitive). `main` is the default branch; work happens on feature
+branches with a PR back into `main` — see `~/.claude/agents/CODING.md` if
+you have access to it for the broader git-hygiene convention. CI
+(`.github/workflows/ci.yml`) runs on every push and PR to `main`.

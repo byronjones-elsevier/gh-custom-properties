@@ -37,7 +37,7 @@ func (c *Client) GetRepoProperties(ctx context.Context, owner, repo string) ([]P
 	if err != nil {
 		return nil, fmt.Errorf("GET %s: %w", path, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -84,7 +84,7 @@ func (c *Client) SetRepoProperties(ctx context.Context, owner, repo string, prop
 	if err != nil {
 		return fmt.Errorf("PATCH %s: %w", path, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -107,7 +107,7 @@ func (c *Client) GetOrgSchema(ctx context.Context, org string) ([]PropertyDefini
 	if err != nil {
 		return nil, fmt.Errorf("GET %s: %w", path, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

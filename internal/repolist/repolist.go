@@ -39,7 +39,7 @@ func LoadFile(path string) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("open repo list %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return Parse(f)
 }
 

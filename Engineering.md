@@ -26,7 +26,30 @@ internal/
 docs/
   gendocs/                generator invoked via `go generate`; writes
                           docs/gh-custom-properties.1 and .html
+Makefile                  deps/build/install/test/lint/docs-gen/clean; `make
+                          help` lists every target; `make all` mirrors CI
+.github/workflows/ci.yml   lint (golangci-lint), test (ubuntu+macOS), build,
+                          and a check that generated docs are up to date —
+                          on every push/PR to main
 ```
+
+## Build tooling
+
+The Makefile is the single source of truth for the actual commands (`go
+build`, `go test`, etc.); CI's `test`/`build`/`docs` jobs just run `make
+test`/`make build`/`make docs/gen` rather than duplicating them, so local
+and CI behavior can't drift apart. The `lint` job is the one exception —
+it uses `golangci/golangci-lint-action` directly instead of `make lint`,
+for that action's GitHub-native annotations and its own result caching.
+`golangci-lint` needs v2.x (the project uses the v2 config schema
+implicitly via its defaults — there's no `.golangci.yml` yet, just the
+tool's default linter set); an older v1-targeting binary, or one built
+against an older Go toolchain than what `go.mod` specifies, may not run at
+all against this codebase.
+
+Every third-party action in the workflow is pinned to a full commit SHA
+(with the version in a trailing comment) rather than a floating tag, to
+avoid a compromised tag silently changing what CI runs.
 
 ## GitHub API surface
 

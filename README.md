@@ -10,11 +10,8 @@ of the prior values.
 
 ## Demo
 
-https://github.com/byronjones-elsevier/gh-custom-properties/raw/main/assets/gh-custom-properties.gif
+<img src="./assets/gh-custom-properties.gif" width="100%" alt="GH-Custom-Properties Demo" />
 
-(GitHub renders the link above as an inline video player once it's on the
-`main` branch. If it doesn't for you, the file is at
-[`assets/gh-custom-properties.gif`](assets/gh-custom-properties.gif).)
 
 ## Install
 

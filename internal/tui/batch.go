@@ -10,10 +10,37 @@ import (
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/backup"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/ghclient"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/repolist"
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	menubar "github.com/jejacks0n/bubbletea-menubar"
 )
+
+// batchTableHelpKeys adapts the repo table's key hints to bubbles/help's
+// KeyMap interface for renderFooterPanel. Unlike singleListHelpKeys, these
+// aren't real key.Bindings wired to key.Matches dispatch (handleTableKey
+// switches on msg.String() directly), so keyBinding display-only bindings
+// are used throughout.
+type batchTableHelpKeys struct{}
+
+func (batchTableHelpKeys) ShortHelp() []key.Binding {
+	return []key.Binding{
+		keyBinding("↑/k", "up"), keyBinding("↓/j", "down"), keyBinding("b", "bulk edit"),
+		keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help"),
+		keyBinding("q", "quit"),
+	}
+}
+
+func (batchTableHelpKeys) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{keyBinding("↑/k", "up"), keyBinding("↓/j", "down")},
+		{keyBinding("b", "bulk edit")},
+		{keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help")},
+		{keyBinding("q", "quit")},
+	}
+}
 
 // batchFetchWorkers/batchApplyWorkers bound how many repos are fetched or
 // patched concurrently, so a large repo list doesn't open hundreds of
@@ -89,6 +116,7 @@ type batchModel struct {
 	filter       string // "?" starts composing this; narrows the table to a case-insensitive substring match on owner/repo
 	filtering    bool
 	pendingFlash *pendingFlash // set by a hub-screen command key; see keys.go
+	help         help.Model    // renders the boxed footer panel; see renderFooterPanel
 
 	action        bulkActionKind
 	editor        *valueEditor
@@ -112,6 +140,7 @@ func newBatchModel(api ghclient.PropertiesAPI, backupDir string, entries []repol
 		screen:    bScreenLoading,
 		spin:      newSpinner(),
 		prog:      progress.New(progress.WithDefaultGradient()),
+		help:      newHelpModel(),
 		entries:   entries,
 		skipped:   skipped,
 	}
@@ -594,10 +623,10 @@ func upsertOrDeleteProperty(props []ghclient.PropertyValue, name string, value a
 	return append(props, ghclient.PropertyValue{Name: name, Value: value})
 }
 
-// header returns the persistent banner shown at the top of every screen:
-// the org the batch is drawn from (or a note that it spans multiple orgs)
-// and how many repos are involved.
-func (m *batchModel) header() string {
+// headerText returns the plain identity text shown on the right side of the
+// top bar: the org the batch is drawn from (or a note that it spans
+// multiple orgs) and how many repos are involved.
+func (m *batchModel) headerText() string {
 	count := len(m.entries)
 	org := ownerOf(m.entries)
 	if len(m.rows) > 0 {
@@ -605,9 +634,26 @@ func (m *batchModel) header() string {
 		org = ownerOfRows(m.rows)
 	}
 	if org == "" {
-		return renderHeader(fmt.Sprintf("%d repo(s) — multiple orgs", count))
+		return fmt.Sprintf("%d repo(s) — multiple orgs", count)
 	}
-	return renderHeader(fmt.Sprintf("%s — %d repo(s)", org, count))
+	return fmt.Sprintf("%s — %d repo(s)", org, count)
+}
+
+// topBarItems returns the commands shown in the top bar for the current
+// screen — only the repo table has commands worth showing there.
+func (m *batchModel) topBarItems() []menubar.MenuItem {
+	if m.screen != bScreenTable {
+		return nil
+	}
+	return []menubar.MenuItem{
+		{Label: "Bulk edit", Hotkey: "b"},
+		menubar.Separator(),
+		{Label: "Filter", Hotkey: "?"},
+		{Label: "Refresh", Hotkey: "F5"},
+		{Label: "Help", Hotkey: "F1"},
+		menubar.Separator(),
+		{Label: "Quit", Hotkey: "q"},
+	}
 }
 
 // ownerOf/ownerOfRows return the common owner across entries/rows, or "" if
@@ -639,12 +685,12 @@ func ownerOfRows(rows []repoRow) string {
 }
 
 func (m *batchModel) View() string {
-	header := m.header()
+	top := renderTopBar(m.topBarItems(), m.headerText(), m.width)
 	if m.screen == bScreenTable {
 		content, footer := m.viewTableParts()
-		return boxStyle.Render(pinFooter(header+content, footer, m.height))
+		return boxStyle.Render(pinFooter(top+"\n\n"+content, footer, m.height))
 	}
-	return boxStyle.Render(header + m.viewBody())
+	return boxStyle.Render(top + "\n\n" + m.viewBody())
 }
 
 func (m *batchModel) viewBody() string {
@@ -706,6 +752,7 @@ func (m *batchModel) viewTableParts() (content, footer string) {
 		default:
 			line = fmt.Sprintf("%-40s %s", r.label(), summarizeProperties(r.properties))
 		}
+		line = truncateToWidth(line, rowContentWidth(m.width))
 		if i == m.cursor {
 			b.WriteString(cursorStyle.Render("> ") + selectedStyle.Render(line) + "\n")
 		} else {
@@ -720,14 +767,7 @@ func (m *batchModel) viewTableParts() (content, footer string) {
 		b.WriteString("\n" + errorStyle.Render(m.err.Error()) + "\n")
 	}
 
-	flashLabel := ""
-	if m.pendingFlash != nil {
-		flashLabel = m.pendingFlash.label
-	}
-	footer = helpLineFlash(flashLabel,
-		keyBinding("↑/k", "up"), keyBinding("↓/j", "down"), keyBinding("b", "bulk edit"), keyBinding("q", "quit"),
-		keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help"),
-	)
+	footer = renderFooterPanel(m.help, m.width, batchTableHelpKeys{})
 	return b.String(), footer
 }
 

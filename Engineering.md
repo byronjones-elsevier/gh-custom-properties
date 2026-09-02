@@ -20,7 +20,9 @@ internal/
                           Alt+letter commands work where the terminal
                           supports it (see "Alt-key commands" below)
   tui/                    Bubble Tea models: single-repo flow, batch flow,
-                          shared type-aware value editor
+                          shared type-aware value editor, the top bar
+                          (bubbletea-menubar) and boxed footer panel
+                          (bubbles/help) — see their sections below
 docs/
   gendocs/                generator invoked via `go generate`; writes
                           docs/gh-custom-properties.1 and .html
@@ -179,26 +181,74 @@ cancel/back meaning.
 `singleRepoModel`/`batchModel` defer a hub screen's command key (`a`/`e`/
 `d`/`s`/`q` on the property list, `b`/`q` on the repo table) via
 `pendingFlash{label, action}` and a `flashTick()` (100ms), instead of
-running the action immediately — the footer highlights the matching
-segment (`helpLineFlash`, `flashStyle`) while it's pending, then
-`flashElapsedMsg` fires the stored `action`. Scoped to these two hub
-screens only; sub-screens (editors, confirm dialogs) are lower-frequency
-interactions where the added delay would cost more than it's worth.
-`helpLine`'s segments are styled individually and joined unstyled, rather
-than wrapping the whole joined string in one `Render` call — nesting a
-differently-styled flash segment inside an outer `Render` would have its
-ANSI reset code kill the outer style for everything after it.
+running the action immediately, then `flashElapsedMsg` fires the stored
+`action`. Scoped to these two hub screens only; sub-screens (editors,
+confirm dialogs) are lower-frequency interactions where the added delay
+would cost more than it's worth. There's no visual highlight on the
+footer for the pending key anymore — that was dropped once the footer
+moved to `bubbles/help`-based rendering (see "Boxed, width-aware footer
+panel" below), which has no hook for overriding a single item's style;
+`pendingFlash.label` is kept (read by tests) even though nothing renders
+it now.
 
-### Bottom-pinned footer
+### Top bar
+
+`internal/tui/styles.go`'s `renderTopBar` renders the persistent top bar —
+relevant commands on the left, the owner/repo (or batch org/count) identity
+right-aligned — using `github.com/jejacks0n/bubbletea-menubar`'s `Model`
+purely for its label-plus-underlined-hotkey rendering (`Styles.Hotkey`
+underlines whichever letter in a label matches that item's `Hotkey`, e.g.
+"Add" with `Hotkey: "a"` underlines the A). It's always constructed with
+`Active` left `false`: our own key handlers already dispatch every one of
+these commands (and have to — `?` means something different depending on
+whether the property list is currently filtering, for instance), so wiring
+up the package's own navigation/activation would create a second,
+conflicting dispatch path for the exact same keys. This is display-only.
+`topBarItems()` on each model returns `nil` outside the hub screen, so
+secondary screens (input, an open editor, ...) show just the identity text
+with no commands that aren't actually available.
+
+`ViewBarWithRightSide` only uses its `width` argument to size the spacer
+before the right-aligned text — it doesn't truncate or wrap the items
+themselves. Our full item set needs roughly 75-80 columns, which is wider
+than `App`'s own minimum width (60), so `renderTopBar` measures its own
+output and falls back to dropping the items (keeping just the identity
+text) if it would overflow — the footer panel below is the guaranteed-fit
+place to find the commands regardless.
+
+### Boxed, width-aware footer panel
 
 The property list and repo table split their render into content and a
 separate `footer` return value (`viewListParts`/`viewTableParts`, mirroring
-the `header()` method already used for the org/repo banner);
-`pinFooter(content, footer, height)` (`internal/tui/scroll.go`) pads
-between them with blank lines up to the known terminal height, so the
-footer lands on the last row instead of floating wherever the content ends.
-Scoped to these two hub screens for the same reason as flash-on-keypress —
-sub-screens are short enough that pinning adds little.
+the `header()`-style split used for the top bar); `pinFooter(content,
+footer, height)` (`internal/tui/scroll.go`) pads between them with blank
+lines up to the known terminal height, so the footer lands on the last row
+instead of floating wherever the content ends. Scoped to these two hub
+screens — sub-screens are short enough that pinning adds little.
+
+The footer itself (`renderFooterPanel`, `internal/tui/styles.go`) is a
+`bubbles/help`-styled, bordered panel (`footerPanelStyle`): it tries
+`help.Model.ShortHelpView` (one line) first, and if that doesn't fit
+`footerContentWidth`, falls back to `wrapShortHelp`, which packs "key desc"
+hints onto as many lines as needed rather than eliding any of them — using
+`help.Model.Styles.ShortKey`/`ShortDesc` for the same key/description
+styling `ShortHelpView` itself would use, so the two look identical. This
+doesn't use `help.Model.FullHelpView` (its natural fixed-height-column
+mode): that view's own width-fitting has a gap — if even a single column
+doesn't fit and there's no room left for an ellipsis marker, it falls
+through to rendering that oversized column anyway (see its
+`shouldAddItem`) — so it doesn't reliably guarantee everything fits, which
+is the whole point here.
+
+Both the top bar and the footer panel's width math have to account for
+`boxStyle`'s own horizontal padding (`outerFrameWidth`, `internal/tui/styles.go`),
+since both are rendered inside that same wrap around the whole screen —
+sizing either to the raw terminal width, without subtracting that, overflows
+the real terminal by that much. The property list/repo table's own row
+text (`%-30s`/`%-40s`-formatted) needed the same fix: `rowContentWidth` plus
+`truncateToWidth` (ANSI-aware, via `charmbracelet/x/ansi`'s `Truncate`) cap
+each row to what's actually available, which the fixed-width formatting
+alone never did.
 
 ### Alt-key commands
 

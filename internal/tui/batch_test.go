@@ -75,8 +75,11 @@ func TestBatchModel_FooterPinnedToLastRow(t *testing.T) {
 	if len(lines) != 20 {
 		t.Fatalf("got %d lines, want 20:\n%s", len(lines), m.View())
 	}
-	if !strings.Contains(lines[len(lines)-1], "quit") {
-		t.Errorf("last line = %q, want the footer", lines[len(lines)-1])
+	if !strings.Contains(lines[len(lines)-1], "└") {
+		t.Errorf("last line = %q, want the footer panel's bottom border", lines[len(lines)-1])
+	}
+	if !strings.Contains(m.View(), "quit") {
+		t.Errorf("view is missing the quit hint:\n%s", m.View())
 	}
 }
 

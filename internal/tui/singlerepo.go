@@ -8,11 +8,36 @@ import (
 
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/backup"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/ghclient"
+	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	menubar "github.com/jejacks0n/bubbletea-menubar"
 )
+
+// singleListHelpKeys adapts the property list's key bindings to
+// bubbles/help's KeyMap interface for renderFooterPanel.
+type singleListHelpKeys struct {
+	keys listKeyMap
+}
+
+func (k singleListHelpKeys) ShortHelp() []key.Binding {
+	return []key.Binding{
+		k.keys.Up, k.keys.Add, k.keys.Edit, k.keys.Delete, k.keys.Save,
+		keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help"),
+		k.keys.Quit,
+	}
+}
+
+func (k singleListHelpKeys) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{k.keys.Up, k.keys.Down},
+		{k.keys.Add, k.keys.Edit, k.keys.Delete, k.keys.Save},
+		{keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help")},
+		{k.keys.Quit},
+	}
+}
 
 type singleScreen int
 
@@ -68,6 +93,7 @@ type singleRepoModel struct {
 	pendingDeleteAt int // -1 when not confirming a delete
 	editor          *valueEditor
 	pendingFlash    *pendingFlash // set by a hub-screen command key; see keys.go
+	help            help.Model    // renders the boxed footer panel; see renderFooterPanel
 
 	width, height int // last known terminal size, from tea.WindowSizeMsg
 
@@ -85,6 +111,7 @@ func newSingleRepoModel(api ghclient.PropertiesAPI, backupDir, owner, repo strin
 		keys:            defaultListKeyMap(),
 		spin:            newSpinner(),
 		pendingDeleteAt: -1,
+		help:            newHelpModel(),
 		owner:           owner,
 		repo:            repo,
 	}
@@ -447,23 +474,46 @@ func (m *singleRepoModel) upsertProperty(v ghclient.PropertyValue) {
 	sort.Slice(m.properties, func(i, j int) bool { return m.properties[i].Name < m.properties[j].Name })
 }
 
-// header returns the persistent "owner/repo" banner shown at the top of
-// every screen once a repo has been chosen (i.e. every screen but the
-// initial repo-input prompt, where there's nothing to show yet).
-func (m *singleRepoModel) header() string {
+// headerText returns the plain "owner/repo" identity text shown on the
+// right side of the top bar once a repo has been chosen, or "" before that
+// (the initial repo-input prompt, where there's nothing to show yet).
+func (m *singleRepoModel) headerText() string {
 	if m.owner == "" || m.repo == "" {
 		return ""
 	}
-	return renderHeader(m.owner + "/" + m.repo)
+	return m.owner + "/" + m.repo
+}
+
+// topBarItems returns the commands shown in the top bar for the current
+// screen — only the property list has commands worth showing there; other
+// screens (input, loading, an open editor, ...) show an empty command bar
+// with just the identity text on the right, rather than commands that
+// aren't actually available right now.
+func (m *singleRepoModel) topBarItems() []menubar.MenuItem {
+	if m.screen != screenList {
+		return nil
+	}
+	return []menubar.MenuItem{
+		{Label: "Add", Hotkey: "a"},
+		{Label: "Edit", Hotkey: "e"},
+		{Label: "Delete", Hotkey: "d"},
+		{Label: "Save", Hotkey: "s"},
+		menubar.Separator(),
+		{Label: "Filter", Hotkey: "?"},
+		{Label: "Refresh", Hotkey: "F5"},
+		{Label: "Help", Hotkey: "F1"},
+		menubar.Separator(),
+		{Label: "Quit", Hotkey: "q"},
+	}
 }
 
 func (m *singleRepoModel) View() string {
-	header := m.header()
+	top := renderTopBar(m.topBarItems(), m.headerText(), m.width)
 	if m.screen == screenList {
 		content, footer := m.viewListParts()
-		return boxStyle.Render(pinFooter(header+content, footer, m.height))
+		return boxStyle.Render(pinFooter(top+"\n\n"+content, footer, m.height))
 	}
-	return boxStyle.Render(header + m.viewBody())
+	return boxStyle.Render(top + "\n\n" + m.viewBody())
 }
 
 func (m *singleRepoModel) viewBody() string {
@@ -526,7 +576,7 @@ func (m *singleRepoModel) viewListParts() (content, footer string) {
 		}
 		for i := start; i < end; i++ {
 			p := m.properties[indices[i]]
-			line := fmt.Sprintf("%-30s %s", p.Name, formatValue(p.Value))
+			line := truncateToWidth(fmt.Sprintf("%-30s %s", p.Name, formatValue(p.Value)), rowContentWidth(m.width))
 			if i == m.cursor {
 				b.WriteString(cursorStyle.Render("> ") + selectedStyle.Render(line) + "\n")
 			} else {
@@ -542,14 +592,7 @@ func (m *singleRepoModel) viewListParts() (content, footer string) {
 		b.WriteString("\n" + errorStyle.Render(m.err.Error()) + "\n")
 	}
 
-	flashLabel := ""
-	if m.pendingFlash != nil {
-		flashLabel = m.pendingFlash.label
-	}
-	footer = helpLineFlash(flashLabel,
-		m.keys.Up, m.keys.Down, m.keys.Add, m.keys.Edit, m.keys.Delete, m.keys.Save, m.keys.Quit,
-		keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help"),
-	)
+	footer = renderFooterPanel(m.help, m.width, singleListHelpKeys{keys: m.keys})
 	return b.String(), footer
 }
 

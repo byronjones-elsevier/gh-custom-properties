@@ -35,6 +35,12 @@ values instead of type-aware pickers.
 
 ## Usage
 
+Every screen has a top bar (commands on the left, the repo/org context
+right-aligned) and, on the property list and repo table, a boxed command
+reference pinned to the bottom — it shows one line when everything fits,
+wrapping onto more lines rather than eliding any command if the terminal's
+too narrow for one line.
+
 Single repo, interactively:
 
 ```sh

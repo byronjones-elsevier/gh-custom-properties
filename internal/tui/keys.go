@@ -49,32 +49,19 @@ func keyBinding(keyStr, desc string) key.Binding {
 	return key.NewBinding(key.WithKeys(keyStr), key.WithHelp(keyStr, desc))
 }
 
-// helpLine renders a compact single-line help footer from binding help text.
+// helpLine renders a compact single-line help footer from binding help
+// text, for the small ad hoc hints on sub-screens (confirm dialogs, the
+// value editor, ...). The two hub screens' persistent command panel uses
+// renderFooterPanel instead (see styles.go) — boxed, width-aware, and with
+// its own key/description styling via bubbles/help.
 func helpLine(bindings ...key.Binding) string {
-	return helpLineFlash("", bindings...)
-}
-
-// helpLineFlash is helpLine, but the segment whose help key matches
-// flashLabel (if any) renders with flashStyle instead of helpStyle —
-// briefly acknowledging a just-pressed command key before its action runs
-// (see pendingFlash). Segments are styled individually, then joined
-// unstyled, rather than wrapping the whole joined string in one Render
-// call: nesting a styled flashStyle segment inside an outer helpStyle
-// Render would have the inner segment's ANSI reset code kill the outer
-// style for everything after it.
-func helpLineFlash(flashLabel string, bindings ...key.Binding) string {
 	parts := make([]string, 0, len(bindings))
 	for _, b := range bindings {
 		if !b.Enabled() {
 			continue
 		}
 		h := b.Help()
-		text := h.Key + " " + h.Desc
-		if flashLabel != "" && h.Key == flashLabel {
-			parts = append(parts, flashStyle.Render(text))
-		} else {
-			parts = append(parts, helpStyle.Render(text))
-		}
+		parts = append(parts, helpStyle.Render(h.Key+" "+h.Desc))
 	}
 	sep := helpStyle.Render("  •  ")
 	out := ""
@@ -87,8 +74,10 @@ func helpLineFlash(flashLabel string, bindings ...key.Binding) string {
 	return out
 }
 
-// flashDuration is how long a hub screen's just-pressed command key stays
-// highlighted in the footer before its action actually runs.
+// flashDuration is how long a hub screen defers a command key's action —
+// see pendingFlash. There's no visual flash effect on the footer anymore
+// (bubbles/help's KeyMap interface has no hook for highlighting a single
+// pending item), just the brief pause itself.
 const flashDuration = 100 * time.Millisecond
 
 // flashElapsedMsg fires flashDuration after a command key sets pendingFlash.

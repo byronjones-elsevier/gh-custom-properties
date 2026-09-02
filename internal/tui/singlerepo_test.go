@@ -96,8 +96,11 @@ func TestSingleRepoModel_FooterPinnedToLastRow(t *testing.T) {
 	if len(lines) != 20 {
 		t.Fatalf("got %d lines, want 20:\n%s", len(lines), m.View())
 	}
-	if !strings.Contains(lines[len(lines)-1], "quit") {
-		t.Errorf("last line = %q, want the footer", lines[len(lines)-1])
+	if !strings.Contains(lines[len(lines)-1], "└") {
+		t.Errorf("last line = %q, want the footer panel's bottom border", lines[len(lines)-1])
+	}
+	if !strings.Contains(m.View(), "quit") {
+		t.Errorf("view is missing the quit hint:\n%s", m.View())
 	}
 }
 
@@ -278,7 +281,7 @@ func TestSingleRepoModel_InputScreenHasNoHeader(t *testing.T) {
 	}
 }
 
-func TestSingleRepoModel_CommandKeyFlashesBeforeActing(t *testing.T) {
+func TestSingleRepoModel_CommandKeyDefersActionBriefly(t *testing.T) {
 	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "team", Value: "platform"}}, nil, ghclient.ErrSchemaUnavailable)
 
 	next, cmd := m.Update(runeKey('d'))
@@ -288,9 +291,6 @@ func TestSingleRepoModel_CommandKeyFlashesBeforeActing(t *testing.T) {
 	}
 	if m.pendingFlash == nil || m.pendingFlash.label != "d" {
 		t.Fatalf("pendingFlash = %+v, want label \"d\"", m.pendingFlash)
-	}
-	if !strings.Contains(m.View(), "delete") {
-		t.Errorf("footer should still show the delete hint while flashing:\n%s", m.View())
 	}
 	if cmd == nil {
 		t.Fatal("expected a flash-tick command")

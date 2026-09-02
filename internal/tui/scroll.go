@@ -1,6 +1,37 @@
 package tui
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/charmbracelet/x/ansi"
+)
+
+// rowContentWidth returns how many columns a list/table row's own text can
+// use: the terminal width, minus outerFrameWidth (boxStyle's padding around
+// the whole screen) and the row's 2-column cursor/indent prefix ("> " or
+// "  "). Returns 0 (unbounded) when width is unknown.
+func rowContentWidth(width int) int {
+	if width <= 0 {
+		return 0
+	}
+	const rowPrefixWidth = 2
+	w := width - outerFrameWidth - rowPrefixWidth
+	if w < 10 {
+		return 0
+	}
+	return w
+}
+
+// truncateToWidth ANSI-aware-truncates s to at most width visible columns
+// (preserving any embedded color codes), appending "…" if it had to cut
+// anything. width <= 0 means unbounded (no truncation) — the same
+// convention used elsewhere for an unknown terminal size.
+func truncateToWidth(s string, width int) string {
+	if width <= 0 {
+		return s
+	}
+	return ansi.Truncate(s, width, "…")
+}
 
 // filterIndices returns the indices into items whose value contains filter
 // as a case-insensitive substring, preserving order. Shared by optionPicker

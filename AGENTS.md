@@ -9,8 +9,9 @@ Notes for an AI coding agent picking this repository back up. See
 - Module: `github.com/ByronJones-Elsevier/gh-custom-properties`, Go 1.23+.
 - No third-party GitHub SDK — `internal/ghclient` talks to the REST API
   directly via `net/http`. External dependencies are UI
-  (`charmbracelet/bubbletea`, `bubbles`, `lipgloss`) plus `golang.org/x/term`
-  (used only by `internal/termkeys`'s Alt-key detection probe).
+  (`charmbracelet/bubbletea`, `bubbles`, `lipgloss`, `jejacks0n/bubbletea-menubar`
+  for the top bar) plus `golang.org/x/term` (used only by
+  `internal/termkeys`'s Alt-key detection probe).
 - `internal/clidoc` is the single source of truth for the CLI's flags/help
   text. If you change a flag in `main.go`, update
   `internal/clidoc/spec.go` first and run `go generate ./...` to

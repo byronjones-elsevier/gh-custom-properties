@@ -6,6 +6,14 @@ on a repository — either one repo at a time, or in bulk across a list of
 repos loaded from a file. Every change is preceded by a timestamped backup
 of the prior values.
 
+## Demo
+
+https://github.com/byronjones-elsevier/gh-custom-properties/raw/main/assets/gh-custom-properties.mov
+
+(GitHub renders the link above as an inline video player once it's on the
+`main` branch. If it doesn't for you, the file is at
+[`assets/gh-custom-properties.mov`](assets/gh-custom-properties.mov).)
+
 ## Install
 
 ```sh

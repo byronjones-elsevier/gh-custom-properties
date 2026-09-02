@@ -27,7 +27,7 @@ func TestVisibleWindow(t *testing.T) {
 				t.Errorf("visibleWindow(%d, %d, %d) = %d, %d; want %d, %d",
 					tt.n, tt.cursor, tt.maxVisible, start, end, tt.wantStart, tt.wantEnd)
 			}
-			if tt.maxVisible > 0 && !(tt.cursor >= start && tt.cursor < end) {
+			if tt.maxVisible > 0 && (tt.cursor < start || tt.cursor >= end) {
 				t.Errorf("visibleWindow(%d, %d, %d) = [%d, %d) does not contain cursor", tt.n, tt.cursor, tt.maxVisible, start, end)
 			}
 		})

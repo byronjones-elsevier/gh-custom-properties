@@ -1,5 +1,7 @@
 # gh-custom-properties
 
+[![CI](https://github.com/byronjones-elsevier/gh-custom-properties/actions/workflows/ci.yml/badge.svg)](https://github.com/byronjones-elsevier/gh-custom-properties/actions/workflows/ci.yml)
+
 A terminal UI for viewing, adding, editing, and deleting [GitHub custom
 properties](https://docs.github.com/en/organizations/managing-organization-settings/managing-custom-properties-for-repositories-in-your-organization)
 on a repository — either one repo at a time, or in bulk across a list of
@@ -214,9 +216,14 @@ notes, and [AGENTS.md](AGENTS.md) for notes aimed at an AI coding agent
 picking this repo back up.
 
 ```sh
-go build ./...
-go vet ./...
-go test ./...
-gofmt -l .          # should print nothing
-go generate ./...   # regenerate docs/*.1 and docs/*.html after editing internal/clidoc
+make help   # list every target
+make all    # fmt/check, vet, lint, test, build — mirrors CI
+make build  # just build the binary
+make test   # just run the test suite
+make run ARGS="--file repos.txt"   # build and run with flags
 ```
+
+`make lint` needs [golangci-lint](https://golangci-lint.run/welcome/install/)
+installed. CI (`.github/workflows/ci.yml`) runs the same checks (plus macOS,
+and a check that `docs/*.1`/`docs/*.html` match what `go generate` produces)
+on every push and pull request to `main`.

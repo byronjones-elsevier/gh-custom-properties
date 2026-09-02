@@ -104,7 +104,7 @@ func readFile(path string) (map[string]string, error) {
 		}
 		return nil, fmt.Errorf("open config file %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	values := map[string]string{}
 	scanner := bufio.NewScanner(f)

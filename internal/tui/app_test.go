@@ -28,8 +28,7 @@ func TestApp_CtrlCShowsConfirmThenQuits(t *testing.T) {
 		t.Errorf("expected quit-confirm overlay, got:\n%s", a.View())
 	}
 
-	next, cmd = a.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
-	a = next.(*App)
+	_, cmd = a.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	if !isQuitCmd(t, cmd) {
 		t.Error("second ctrl+c while confirming should quit")
 	}

@@ -105,10 +105,14 @@ repo's org schema. If a repo in a different org doesn't recognize the
 chosen property, that repo's apply result will show the API error rather
 than being silently skipped.
 
-On the repo table: `↑`/`↓`/`j`/`k` and paging move the selection, `?`
-filters the table by `owner/repo`, `b` starts a bulk edit, `F5` re-fetches
-every repo from GitHub (discarding nothing — batch mode never stages
-unapplied edits), and `q` quits.
+On the repo table: `↑`/`↓`/`j`/`k` and paging move the selection, `enter`/`e`
+opens the selected repo's individual property screen, and `?` filters the
+table by `owner/repo`. The individual screen shows every field defined by
+the organization schema, including fields that are currently unset, and
+supports the same add/edit/delete/apply workflow as single-repo mode. Press
+`esc` or `q` to return to the repo table without saving. `b` starts a bulk
+edit, `F5` re-fetches every repo from GitHub (discarding nothing — batch mode
+never stages unapplied edits), and `q` quits from the table.
 
 ## Global keybindings
 

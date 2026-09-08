@@ -27,7 +27,7 @@ type batchTableHelpKeys struct{}
 
 func (batchTableHelpKeys) ShortHelp() []key.Binding {
 	return []key.Binding{
-		keyBinding("↑/k", "up"), keyBinding("↓/j", "down"), keyBinding("b", "bulk edit"),
+		keyBinding("↑/k", "up"), keyBinding("↓/j", "down"), keyBinding("enter/e", "repo details"), keyBinding("b", "bulk edit"),
 		keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help"),
 		keyBinding("q", "quit"),
 	}
@@ -36,6 +36,7 @@ func (batchTableHelpKeys) ShortHelp() []key.Binding {
 func (batchTableHelpKeys) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{keyBinding("↑/k", "up"), keyBinding("↓/j", "down")},
+		{keyBinding("enter/e", "repo details")},
 		{keyBinding("b", "bulk edit")},
 		{keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help")},
 		{keyBinding("q", "quit")},
@@ -55,6 +56,7 @@ type batchScreen int
 const (
 	bScreenLoading batchScreen = iota
 	bScreenTable
+	bScreenDetail
 	bScreenChooseAction
 	bScreenChooseProperty
 	bScreenChooseTargets
@@ -131,6 +133,12 @@ type batchModel struct {
 	width, height int // last known terminal size, from tea.WindowSizeMsg
 
 	err error
+
+	// detail reuses the single-repository property editor for the selected
+	// row. It is kept here so the batch table can receive the saved values
+	// when the detail screen is dismissed.
+	detail    *singleRepoModel
+	detailRow int
 }
 
 func newBatchModel(api ghclient.PropertiesAPI, backupDir string, entries []repolist.Entry, skipped []repolist.Skipped) *batchModel {
@@ -213,6 +221,32 @@ func fetchChunkCmd(api ghclient.PropertiesAPI, chunk []repolist.Entry) tea.Cmd {
 }
 
 func (m *batchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.detail != nil {
+		// A detail result is dismissed back to the batch table, rather than
+		// quitting the application as it does in standalone mode.
+		if m.detail.screen == screenResult {
+			if m.detail.err == nil {
+				m.rows[m.detailRow].properties = propertiesWithValues(m.detail.properties)
+				m.rows[m.detailRow].loaded = append([]ghclient.PropertyValue{}, m.rows[m.detailRow].properties...)
+			}
+			m.detail = nil
+			m.screen = bScreenTable
+			return m, nil
+		}
+		if km, ok := msg.(tea.KeyMsg); ok && m.detail.screen == screenList &&
+			(km.String() == "q" || km.String() == "alt+q" || km.String() == "esc") {
+			m.detail = nil
+			m.screen = bScreenTable
+			return m, nil
+		}
+		if wsm, ok := msg.(tea.WindowSizeMsg); ok {
+			m.width, m.height = wsm.Width, wsm.Height
+		}
+		next, cmd := m.detail.Update(msg)
+		m.detail = next.(*singleRepoModel)
+		return m, cmd
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -277,6 +311,8 @@ func (m *batchModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case bScreenTable:
 		return m.handleTableKey(msg)
+	case bScreenDetail:
+		return m, nil
 	case bScreenChooseAction:
 		return m.handleChooseActionKey(msg)
 	case bScreenChooseProperty:
@@ -389,8 +425,67 @@ func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.screen = bScreenChooseAction
 			return m, nil
 		})
+	case s == "enter" || s == "e" || s == "alt+e":
+		if m.cursor < 0 || m.cursor >= len(indices) {
+			return m, nil
+		}
+		rowIndex := indices[m.cursor]
+		if m.rows[rowIndex].err != nil {
+			m.err = fmt.Errorf("cannot edit %s: properties failed to load", m.rows[rowIndex].label())
+			return m, nil
+		}
+		return m.deferAction("enter/e", func() (tea.Model, tea.Cmd) {
+			m.openDetail(rowIndex)
+			return m, nil
+		})
 	}
 	return m, nil
+}
+
+// openDetail creates a single-repository editor from the row selected in the
+// batch table. Schema-defined properties that are not currently set are
+// included as nil values so the detail screen shows every field, not only
+// fields returned by GitHub for that repository.
+func (m *batchModel) openDetail(rowIndex int) {
+	row := m.rows[rowIndex]
+	detail := newSingleRepoModel(m.api, m.backupDir, row.owner, row.repo)
+	detail.screen = screenList
+	detail.width, detail.height = m.width, m.height
+	detail.properties = propertiesWithSchema(row.properties, m.schemaByOrg[row.owner])
+	detail.loaded = append([]ghclient.PropertyValue{}, row.properties...)
+	detail.schema = append([]ghclient.PropertyDefinition{}, m.schemaByOrg[row.owner]...)
+	detail.schemaByName = make(map[string]ghclient.PropertyDefinition, len(detail.schema))
+	for _, def := range detail.schema {
+		detail.schemaByName[def.Name] = def
+	}
+	m.detail = detail
+	m.detailRow = rowIndex
+	m.screen = bScreenDetail
+}
+
+func propertiesWithSchema(properties []ghclient.PropertyValue, schema []ghclient.PropertyDefinition) []ghclient.PropertyValue {
+	result := append([]ghclient.PropertyValue{}, properties...)
+	set := make(map[string]bool, len(result))
+	for _, property := range result {
+		set[property.Name] = true
+	}
+	for _, def := range schema {
+		if !set[def.Name] {
+			result = append(result, ghclient.PropertyValue{Name: def.Name})
+		}
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+	return result
+}
+
+func propertiesWithValues(properties []ghclient.PropertyValue) []ghclient.PropertyValue {
+	result := make([]ghclient.PropertyValue, 0, len(properties))
+	for _, property := range properties {
+		if property.Value != nil {
+			result = append(result, property)
+		}
+	}
+	return result
 }
 
 // deferAction defers a hub-screen command's effect until its footer key
@@ -685,6 +780,9 @@ func ownerOfRows(rows []repoRow) string {
 }
 
 func (m *batchModel) View() string {
+	if m.detail != nil {
+		return m.detail.View()
+	}
 	top := renderTopBar(m.topBarItems(), m.headerText(), m.width)
 	if m.screen == bScreenTable {
 		content, footer := m.viewTableParts()
@@ -810,7 +908,8 @@ func (m *batchModel) viewChooseTargets() string {
 func (m *batchModel) viewResult() string {
 	var b strings.Builder
 	if m.backupErr != nil {
-		b.WriteString(errorStyle.Render("Failed to write backup, no changes were applied: "+m.backupErr.Error()) + "\n")
+		contentWidth := m.width - outerFrameWidth
+		b.WriteString(errorStyle.Render(wrapToWidth("Failed to write backup, no changes were applied: "+m.backupErr.Error(), contentWidth)) + "\n")
 		b.WriteString("\n" + helpLine(keyBinding("any key", "back to repo list")))
 		return b.String()
 	}
@@ -831,7 +930,8 @@ func (m *batchModel) viewResult() string {
 	b.WriteString("\n\n")
 	for _, r := range m.applyResults {
 		if r.err != nil {
-			b.WriteString(errorStyle.Render(fmt.Sprintf("  %s/%s: %s", r.owner, r.repo, r.err)) + "\n")
+			contentWidth := m.width - outerFrameWidth
+			b.WriteString(errorStyle.Render(wrapToWidth(fmt.Sprintf("  %s/%s: %s", r.owner, r.repo, r.err), contentWidth)) + "\n")
 		}
 	}
 	b.WriteString("\n" + helpLine(keyBinding("any key", "back to repo list")))

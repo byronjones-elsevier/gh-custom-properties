@@ -274,6 +274,25 @@ func TestSingleRepoModel_HeaderShownOnEveryScreen(t *testing.T) {
 	}
 }
 
+func TestSingleRepoModel_ResultWrapsFullError(t *testing.T) {
+	m := newLoadedModel(t, []ghclient.PropertyValue{{Name: "team", Value: "platform"}}, nil, ghclient.ErrSchemaUnavailable)
+	m.width = 60
+	m.err = fmt.Errorf(`PATCH /repos/elsevierPTG/prd-shadow-health/properties/values: unexpected status 404: {"message":"Not Found","documentation_url":"https://docs.github.com/rest/repos/properties"}`)
+	m.backupPath = "/Users/jonesb7/.gh-custom-properties/backups/elsevierPTG-prd-shadow-health-20260908-120000.json"
+	m.screen = screenResult
+
+	view := m.View()
+	if !strings.Contains(view, `"documentation_url"`) {
+		t.Fatalf("result view dropped the end of the error message:\n%s", view)
+	}
+	if !strings.Contains(view, "20260908-120000.json") {
+		t.Fatalf("result view dropped the end of the backup path:\n%s", view)
+	}
+	if maxLineWidth(view) > m.width {
+		t.Fatalf("result view exceeded terminal width:\n%s", view)
+	}
+}
+
 func TestSingleRepoModel_InputScreenHasNoHeader(t *testing.T) {
 	m := newSingleRepoModel(&fakeAPI{}, t.TempDir(), "", "")
 	if strings.Contains(m.View(), "─") {

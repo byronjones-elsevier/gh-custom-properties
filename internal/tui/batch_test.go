@@ -343,3 +343,69 @@ func TestBatchModel_BulkDeleteSendsNilValue(t *testing.T) {
 		t.Errorf("SetRepoProperties calls = %v, want one call with nil value", api.setCalls)
 	}
 }
+
+func TestBatchModel_OpensIndividualRepoDetail(t *testing.T) {
+	api := &fakeAPI{}
+	rows := []repoRow{{
+		owner:      "acme",
+		repo:       "service",
+		properties: []ghclient.PropertyValue{{Name: "team", Value: "platform"}},
+		loaded:     []ghclient.PropertyValue{{Name: "team", Value: "platform"}},
+	}}
+	schema := map[string][]ghclient.PropertyDefinition{
+		"acme": {
+			{Name: "lifecycle", Type: ghclient.PropertyTypeSingleSelect, AllowedValues: []string{"active", "legacy"}},
+			{Name: "team", Type: ghclient.PropertyTypeString},
+		},
+	}
+	m := newTableModel(t, api, rows, schema)
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	m = next.(*batchModel)
+
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = settleBatch(next.(*batchModel))
+	if m.detail == nil || m.screen != bScreenDetail {
+		t.Fatalf("after enter: detail=%v screen=%v, want detail screen", m.detail, m.screen)
+	}
+	if m.detail.width != 60 || m.detail.height != 20 {
+		t.Fatalf("detail size = %dx%d, want 60x20", m.detail.width, m.detail.height)
+	}
+	if got := m.detail.properties; len(got) != 2 || got[0].Name != "lifecycle" || got[0].Value != nil {
+		t.Fatalf("detail properties = %#v, want unset schema field included first", got)
+	}
+	if !strings.Contains(m.View(), "lifecycle") || !strings.Contains(m.View(), "team") {
+		t.Errorf("detail view should show all fields:\n%s", m.View())
+	}
+
+	// Edit the unset lifecycle field and apply it from the detail view.
+	next, _ = m.detail.Update(runeKey('e'))
+	m.detail = next.(*singleRepoModel)
+	m = settleBatch(m)
+	next, _ = m.detail.Update(tea.KeyMsg{Type: tea.KeyEnter}) // choose lifecycle
+	m.detail = next.(*singleRepoModel)
+	next, _ = m.detail.Update(tea.KeyMsg{Type: tea.KeyEnter}) // choose active
+	m.detail = next.(*singleRepoModel)
+	if m.detail.screen != screenList {
+		t.Fatalf("after detail edit: screen=%v, want list", m.detail.screen)
+	}
+
+	next, _ = m.detail.Update(runeKey('s'))
+	m.detail = next.(*singleRepoModel)
+	m = settleBatch(m)
+	msg := m.detail.applyCmd()()
+	next, _ = m.detail.Update(msg)
+	m.detail = next.(*singleRepoModel)
+	if m.detail.screen != screenResult || len(api.setCalls) != 1 {
+		t.Fatalf("detail apply: screen=%v setCalls=%d, want result/1", m.detail.screen, len(api.setCalls))
+	}
+
+	// The next key dismisses the detail result and reflects the saved value.
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = next.(*batchModel)
+	if m.detail != nil || m.screen != bScreenTable {
+		t.Fatalf("after dismissing detail: detail=%v screen=%v, want table", m.detail, m.screen)
+	}
+	if len(m.rows[0].properties) != 2 || m.rows[0].properties[0].Name != "lifecycle" {
+		t.Errorf("row properties after detail save = %#v, want lifecycle and team", m.rows[0].properties)
+	}
+}

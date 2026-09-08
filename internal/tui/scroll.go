@@ -33,6 +33,15 @@ func truncateToWidth(s string, width int) string {
 	return ansi.Truncate(s, width, "…")
 }
 
+// wrapToWidth wraps a message instead of dropping its tail. It is used for
+// errors and other diagnostic text where every character is useful.
+func wrapToWidth(s string, width int) string {
+	if width <= 0 {
+		return s
+	}
+	return ansi.Wrap(s, width, "")
+}
+
 // filterIndices returns the indices into items whose value contains filter
 // as a case-insensitive substring, preserving order. Shared by optionPicker
 // and any plain list/table that adds its own "?" filtering.

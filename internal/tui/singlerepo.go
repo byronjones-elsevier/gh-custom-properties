@@ -598,13 +598,15 @@ func (m *singleRepoModel) viewListParts() (content, footer string) {
 func (m *singleRepoModel) viewResult() string {
 	var b strings.Builder
 	if m.err != nil {
-		b.WriteString(errorStyle.Render("Failed: "+m.err.Error()) + "\n")
+		contentWidth := m.width - outerFrameWidth
+		b.WriteString(errorStyle.Render(wrapToWidth("Failed: "+m.err.Error(), contentWidth)) + "\n")
 		if m.backupPath != "" {
-			b.WriteString(dimStyle.Render("Backup of prior values was written to "+m.backupPath) + "\n")
+			b.WriteString(dimStyle.Render(wrapToWidth("Backup of prior values was written to "+m.backupPath, contentWidth)) + "\n")
 		}
 	} else {
 		b.WriteString(successStyle.Render("Applied changes") + "\n")
-		b.WriteString(dimStyle.Render("Backup of prior values: "+m.backupPath) + "\n")
+		contentWidth := m.width - outerFrameWidth
+		b.WriteString(dimStyle.Render(wrapToWidth("Backup of prior values: "+m.backupPath, contentWidth)) + "\n")
 	}
 	b.WriteString("\n" + helpLine(keyBinding("any key", "quit")))
 	return b.String()

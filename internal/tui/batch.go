@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/backup"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/ghclient"
@@ -27,7 +28,7 @@ type batchTableHelpKeys struct{}
 
 func (batchTableHelpKeys) ShortHelp() []key.Binding {
 	return []key.Binding{
-		keyBinding("↑/k", "up"), keyBinding("↓/j", "down"), keyBinding("enter/e", "repo details"), keyBinding("b", "bulk edit"),
+		keyBinding("↑/k", "up"), keyBinding("↓/j", "down"), keyBinding("enter/e", "repo details"), keyBinding("b", "bulk edit"), keyBinding("x", "export CSV"),
 		keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help"),
 		keyBinding("q", "quit"),
 	}
@@ -38,6 +39,7 @@ func (batchTableHelpKeys) FullHelp() [][]key.Binding {
 		{keyBinding("↑/k", "up"), keyBinding("↓/j", "down")},
 		{keyBinding("enter/e", "repo details")},
 		{keyBinding("b", "bulk edit")},
+		{keyBinding("x", "export CSV")},
 		{keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help")},
 		{keyBinding("q", "quit")},
 	}
@@ -62,6 +64,8 @@ const (
 	bScreenChooseTargets
 	bScreenApplying
 	bScreenResult
+	bScreenExporting
+	bScreenExportResult
 )
 
 type bulkActionKind int
@@ -129,6 +133,8 @@ type batchModel struct {
 	applyResults []batchApplyResult
 	backupPath   string
 	backupErr    error
+	exportPath   string
+	exportErr    error
 
 	width, height int // last known terminal size, from tea.WindowSizeMsg
 
@@ -268,6 +274,11 @@ func (m *batchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.applyResultsToRows(msg.results)
 		m.screen = bScreenResult
 		return m, nil
+	case batchExportedMsg:
+		m.exportPath = msg.path
+		m.exportErr = msg.err
+		m.screen = bScreenExportResult
+		return m, nil
 	case flashElapsedMsg:
 		if m.pendingFlash == nil {
 			return m, nil
@@ -320,6 +331,8 @@ func (m *batchModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case bScreenChooseTargets:
 		return m.handleChooseTargetsKey(msg)
 	case bScreenResult:
+		m.screen = bScreenTable
+	case bScreenExportResult:
 		m.screen = bScreenTable
 	}
 	return m, nil
@@ -438,8 +451,28 @@ func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.openDetail(rowIndex)
 			return m, nil
 		})
+	case s == "x" || s == "alt+x":
+		m.err = nil
+		return m.deferAction("x", func() (tea.Model, tea.Cmd) {
+			m.screen = bScreenExporting
+			return m, m.exportCmd()
+		})
 	}
 	return m, nil
+}
+
+type batchExportedMsg struct {
+	path string
+	err  error
+}
+
+func (m *batchModel) exportCmd() tea.Cmd {
+	rows := append([]repoRow{}, m.rows...)
+	schemas := m.schemaByOrg
+	path := fmt.Sprintf("custom-properties-%s.csv", time.Now().Format("20060102-150405"))
+	return func() tea.Msg {
+		return batchExportedMsg{path: path, err: exportBatchCSV(path, rows, schemas)}
+	}
 }
 
 // openDetail creates a single-repository editor from the row selected in the
@@ -805,8 +838,22 @@ func (m *batchModel) viewBody() string {
 		return fmt.Sprintf("\n  %s Applying changes to %d repo(s)...\n", m.spin.View(), len(m.targetRow))
 	case bScreenResult:
 		return m.viewResult()
+	case bScreenExporting:
+		return fmt.Sprintf("\n  %s Exporting %d repo(s)...\n", m.spin.View(), len(m.rows))
+	case bScreenExportResult:
+		return m.viewExportResult()
 	}
 	return ""
+}
+
+func (m *batchModel) viewExportResult() string {
+	if m.exportErr != nil {
+		return errorStyle.Render(wrapToWidth("Failed to export CSV: "+m.exportErr.Error(), m.width-outerFrameWidth)) + "\n\n" +
+			helpLine(keyBinding("any key", "back to repo list"))
+	}
+	return successStyle.Render("Exported CSV") + "\n" +
+		dimStyle.Render(wrapToWidth("File: "+m.exportPath, m.width-outerFrameWidth)) + "\n\n" +
+		helpLine(keyBinding("any key", "back to repo list"))
 }
 
 func (m *batchModel) viewLoading() string {

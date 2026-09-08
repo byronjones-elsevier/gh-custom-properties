@@ -111,8 +111,14 @@ table by `owner/repo`. The individual screen shows every field defined by
 the organization schema, including fields that are currently unset, and
 supports the same add/edit/delete/apply workflow as single-repo mode. Press
 `esc` or `q` to return to the repo table without saving. `b` starts a bulk
-edit, `F5` re-fetches every repo from GitHub (discarding nothing — batch mode
-never stages unapplied edits), and `q` quits from the table.
+edit, `x` exports every loaded repo and its values—including a `repo_url`
+column—to a timestamped CSV in the current directory, `F5` re-fetches every repo from GitHub (discarding
+nothing — batch mode never stages unapplied edits), and `q` quits from the
+table.
+
+The metadata columns are `owner`, `repo`, and `repo_url`. If a custom
+property has the same name as one of those columns, its CSV header is
+prefixed with `property_` to keep every column unambiguous.
 
 ## Global keybindings
 

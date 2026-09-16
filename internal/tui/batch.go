@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 	menubar "github.com/jejacks0n/bubbletea-menubar"
 )
 
@@ -28,7 +29,7 @@ type batchTableHelpKeys struct{}
 
 func (batchTableHelpKeys) ShortHelp() []key.Binding {
 	return []key.Binding{
-		keyBinding("↑/k", "up"), keyBinding("↓/j", "down"), keyBinding("enter/e", "repo details"), keyBinding("b", "bulk edit"), keyBinding("x", "export CSV"),
+		keyBinding("↑/↓", "rows"), keyBinding("←/→", "columns"), keyBinding("enter/e", "repo details"), keyBinding("b", "bulk edit"), keyBinding("u", "unload"), keyBinding("x", "export CSV"),
 		keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help"),
 		keyBinding("q", "quit"),
 	}
@@ -36,10 +37,10 @@ func (batchTableHelpKeys) ShortHelp() []key.Binding {
 
 func (batchTableHelpKeys) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{keyBinding("↑/k", "up"), keyBinding("↓/j", "down")},
+		{keyBinding("↑/↓", "rows"), keyBinding("←/→", "columns")},
 		{keyBinding("enter/e", "repo details")},
 		{keyBinding("b", "bulk edit")},
-		{keyBinding("x", "export CSV")},
+		{keyBinding("u", "unload"), keyBinding("x", "export CSV")},
 		{keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help")},
 		{keyBinding("q", "quit")},
 	}
@@ -59,6 +60,7 @@ const (
 	bScreenLoading batchScreen = iota
 	bScreenTable
 	bScreenDetail
+	bScreenConfirmUnload
 	bScreenChooseAction
 	bScreenChooseProperty
 	bScreenChooseTargets
@@ -121,6 +123,7 @@ type batchModel struct {
 	cursor       int
 	filter       string // "?" starts composing this; narrows the table to a case-insensitive substring match on owner/repo
 	filtering    bool
+	horizontal   int           // first visible terminal cell in the wider repo/property table
 	pendingFlash *pendingFlash // set by a hub-screen command key; see keys.go
 	help         help.Model    // renders the boxed footer panel; see renderFooterPanel
 
@@ -143,8 +146,9 @@ type batchModel struct {
 	// detail reuses the single-repository property editor for the selected
 	// row. It is kept here so the batch table can receive the saved values
 	// when the detail screen is dismissed.
-	detail    *singleRepoModel
-	detailRow int
+	detail          *singleRepoModel
+	detailRow       int
+	pendingUnloadAt int
 }
 
 func newBatchModel(api ghclient.PropertiesAPI, backupDir string, entries []repolist.Entry, skipped []repolist.Skipped) *batchModel {
@@ -172,10 +176,15 @@ func (m *batchModel) startFetch() tea.Cmd {
 	m.schemaByOrg = nil
 	m.chunksDone = 0
 	m.cursor = 0
+	m.horizontal = 0
 	m.err = nil
 
 	chunks := chunkEntries(m.entries, batchFetchWorkers)
 	m.chunksTotal = len(chunks)
+	if m.chunksTotal == 0 {
+		m.screen = bScreenTable
+		return nil
+	}
 	cmds := make([]tea.Cmd, 0, len(chunks)+1)
 	cmds = append(cmds, m.spin.Tick)
 	for _, c := range chunks {
@@ -324,6 +333,8 @@ func (m *batchModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleTableKey(msg)
 	case bScreenDetail:
 		return m, nil
+	case bScreenConfirmUnload:
+		return m.handleConfirmUnloadKey(msg)
 	case bScreenChooseAction:
 		return m.handleChooseActionKey(msg)
 	case bScreenChooseProperty:
@@ -419,6 +430,16 @@ func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor < len(indices)-1 {
 			m.cursor++
 		}
+	case s == "left":
+		m.horizontal -= horizontalScrollStep
+		if m.horizontal < 0 {
+			m.horizontal = 0
+		}
+	case s == "right":
+		m.horizontal += horizontalScrollStep
+		if maxOffset := m.maxHorizontalOffset(); m.horizontal > maxOffset {
+			m.horizontal = maxOffset
+		}
 	case isPageUpKey(s):
 		m.cursor -= pageSize(availableRows(m.height))
 		if m.cursor < 0 {
@@ -457,8 +478,52 @@ func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.screen = bScreenExporting
 			return m, m.exportCmd()
 		})
+	case s == "u" || s == "alt+u":
+		if m.cursor < 0 || m.cursor >= len(indices) {
+			return m, nil
+		}
+		rowIndex := indices[m.cursor]
+		return m.deferAction("u", func() (tea.Model, tea.Cmd) {
+			m.pendingUnloadAt = rowIndex
+			m.screen = bScreenConfirmUnload
+			return m, nil
+		})
 	}
 	return m, nil
+}
+
+func (m *batchModel) handleConfirmUnloadKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "enter":
+		m.unloadRow(m.pendingUnloadAt)
+		m.pendingUnloadAt = -1
+		m.screen = bScreenTable
+	case "n", "esc":
+		m.pendingUnloadAt = -1
+		m.screen = bScreenTable
+	}
+	return m, nil
+}
+
+func (m *batchModel) unloadRow(rowIndex int) {
+	if rowIndex < 0 || rowIndex >= len(m.rows) {
+		return
+	}
+	row := m.rows[rowIndex]
+	rows := make([]repoRow, 0, len(m.rows)-1)
+	rows = append(rows, m.rows[:rowIndex]...)
+	rows = append(rows, m.rows[rowIndex+1:]...)
+	m.rows = rows
+	entries := make([]repolist.Entry, 0, len(m.entries))
+	for _, entry := range m.entries {
+		if entry.Owner != row.owner || entry.Repo != row.repo {
+			entries = append(entries, entry)
+		}
+	}
+	m.entries = entries
+	if indices := m.filteredRowIndices(); m.cursor >= len(indices) && m.cursor > 0 {
+		m.cursor = len(indices) - 1
+	}
 }
 
 type batchExportedMsg struct {
@@ -842,8 +907,18 @@ func (m *batchModel) viewBody() string {
 		return fmt.Sprintf("\n  %s Exporting %d repo(s)...\n", m.spin.View(), len(m.rows))
 	case bScreenExportResult:
 		return m.viewExportResult()
+	case bScreenConfirmUnload:
+		return m.viewConfirmUnload()
 	}
 	return ""
+}
+
+func (m *batchModel) viewConfirmUnload() string {
+	if m.pendingUnloadAt < 0 || m.pendingUnloadAt >= len(m.rows) {
+		return ""
+	}
+	return warnStyle.Render(fmt.Sprintf("Unload %s from the active repo list?", m.rows[m.pendingUnloadAt].label())) + "\n\n" +
+		helpLine(keyBinding("y/enter", "confirm"), keyBinding("n/esc", "cancel"))
 }
 
 func (m *batchModel) viewExportResult() string {
@@ -882,22 +957,23 @@ func (m *batchModel) viewTableParts() (content, footer string) {
 	if len(m.rows) > 0 && len(indices) == 0 {
 		b.WriteString(dimStyle.Render("(no matches)") + "\n")
 	}
-	start, end := visibleWindow(len(indices), m.cursor, availableRows(m.height))
+	columns := m.tableColumns()
+	maxHorizontalOffset := m.maxHorizontalOffsetFor(columns)
+	if len(indices) > 0 {
+		header := m.clipTableLine(renderTableRow(columns, tableColumnHeaders(columns)), maxHorizontalOffset)
+		b.WriteString("  " + headerStyle.Render(header) + "\n")
+	}
+	maxVisible := availableRows(m.height)
+	if maxVisible > 1 {
+		maxVisible--
+	}
+	start, end := visibleWindow(len(indices), m.cursor, maxVisible)
 	if start > 0 {
 		b.WriteString(dimStyle.Render(fmt.Sprintf("  ↑ %d more above", start)) + "\n")
 	}
 	for i := start; i < end; i++ {
 		r := m.rows[indices[i]]
-		var line string
-		switch {
-		case r.err != nil:
-			line = fmt.Sprintf("%-40s %s", r.label(), errorStyle.Render("fetch failed: "+r.err.Error()))
-		case len(r.properties) == 0:
-			line = fmt.Sprintf("%-40s %s", r.label(), dimStyle.Render("(no custom properties set)"))
-		default:
-			line = fmt.Sprintf("%-40s %s", r.label(), summarizeProperties(r.properties))
-		}
-		line = truncateToWidth(line, rowContentWidth(m.width))
+		line := m.clipTableLine(renderTableRow(columns, tableRowValues(r, columns)), maxHorizontalOffset)
 		if i == m.cursor {
 			b.WriteString(cursorStyle.Render("> ") + selectedStyle.Render(line) + "\n")
 		} else {
@@ -916,12 +992,156 @@ func (m *batchModel) viewTableParts() (content, footer string) {
 	return b.String(), footer
 }
 
-func summarizeProperties(props []ghclient.PropertyValue) string {
-	parts := make([]string, len(props))
-	for i, p := range props {
-		parts[i] = p.Name + "=" + formatValue(p.Value)
+const (
+	tableColumnGap       = 2
+	maxTableColumnWidth  = 30
+	horizontalScrollStep = 8
+	tableLeadingEllipsis = "..."
+)
+
+type tableColumn struct {
+	name             string
+	width            int
+	truncateFromLeft bool
+}
+
+func (m *batchModel) tableColumns() []tableColumn {
+	names := map[string]struct{}{}
+	for _, definitions := range m.schemaByOrg {
+		for _, definition := range definitions {
+			names[definition.Name] = struct{}{}
+		}
 	}
-	return strings.Join(parts, ", ")
+	for _, row := range m.rows {
+		for _, property := range row.properties {
+			names[property.Name] = struct{}{}
+		}
+	}
+	propertyNames := make([]string, 0, len(names))
+	for name := range names {
+		propertyNames = append(propertyNames, name)
+	}
+	sort.Strings(propertyNames)
+
+	columns := []tableColumn{{name: "Repository", width: len("Repository"), truncateFromLeft: true}}
+	for _, row := range m.rows {
+		columns[0].width = min(max(columns[0].width, ansi.StringWidth(row.label())), maxTableColumnWidth)
+	}
+	for _, name := range propertyNames {
+		column := tableColumn{name: name, width: min(ansi.StringWidth(name), maxTableColumnWidth)}
+		for _, row := range m.rows {
+			column.width = min(max(column.width, ansi.StringWidth(propertyValue(row.properties, name))), maxTableColumnWidth)
+		}
+		columns = append(columns, column)
+	}
+	columns = append(columns, tableColumn{name: "Status", width: maxStatusWidth(m.rows)})
+	return columns
+}
+
+func maxStatusWidth(rows []repoRow) int {
+	width := len("Status")
+	for _, row := range rows {
+		width = min(max(width, ansi.StringWidth(repoStatus(row))), maxTableColumnWidth)
+	}
+	return width
+}
+
+func tableColumnHeaders(columns []tableColumn) []string {
+	values := make([]string, len(columns))
+	for i, column := range columns {
+		values[i] = column.name
+	}
+	return values
+}
+
+func tableRowValues(row repoRow, columns []tableColumn) []string {
+	values := make([]string, len(columns))
+	values[0] = row.label()
+	for i := 1; i < len(columns)-1; i++ {
+		values[i] = propertyValue(row.properties, columns[i].name)
+	}
+	values[len(values)-1] = repoStatus(row)
+	return values
+}
+
+func propertyValue(properties []ghclient.PropertyValue, name string) string {
+	for _, property := range properties {
+		if property.Name == name {
+			return formatValue(property.Value)
+		}
+	}
+	return ""
+}
+
+func repoStatus(row repoRow) string {
+	if row.err != nil {
+		return "fetch failed: " + row.err.Error()
+	}
+	if len(row.properties) == 0 {
+		return "no properties set"
+	}
+	return ""
+}
+
+func renderTableRow(columns []tableColumn, values []string) string {
+	cells := make([]string, len(columns))
+	for i, column := range columns {
+		value := values[i]
+		if column.truncateFromLeft && ansi.StringWidth(value) > column.width {
+			removeWidth := ansi.StringWidth(value) - column.width + ansi.StringWidth(tableLeadingEllipsis)
+			value = ansi.TruncateLeft(value, removeWidth, tableLeadingEllipsis)
+		} else {
+			value = ansi.Truncate(value, column.width, "…")
+		}
+		cells[i] = value + strings.Repeat(" ", column.width-ansi.StringWidth(value))
+	}
+	return strings.Join(cells, strings.Repeat(" ", tableColumnGap))
+}
+
+func (m *batchModel) maxHorizontalOffset() int {
+	return m.maxHorizontalOffsetFor(m.tableColumns())
+}
+
+func (m *batchModel) maxHorizontalOffsetFor(columns []tableColumn) int {
+	if len(columns) == 0 {
+		return 0
+	}
+	tableWidth := ansi.StringWidth(renderTableRow(columns, tableColumnHeaders(columns)))
+	viewportWidth := rowContentWidth(m.width)
+	if viewportWidth <= 0 || tableWidth <= viewportWidth {
+		return 0
+	}
+	return tableWidth - max(1, viewportWidth-2)
+}
+
+func (m *batchModel) clipTableLine(line string, maxOffset int) string {
+	width := rowContentWidth(m.width)
+	if width <= 0 || maxOffset == 0 {
+		return line
+	}
+	if m.horizontal > maxOffset {
+		m.horizontal = maxOffset
+	}
+	left := m.horizontal > 0
+	right := m.horizontal < maxOffset
+	bodyWidth := width
+	if left {
+		bodyWidth -= 2
+	}
+	if right {
+		bodyWidth -= 2
+	}
+	if bodyWidth < 1 {
+		bodyWidth = 1
+	}
+	body := ansi.Cut(line, m.horizontal, m.horizontal+bodyWidth)
+	if left {
+		body = "‹ " + body
+	}
+	if right {
+		body += " ›"
+	}
+	return body
 }
 
 func (m *batchModel) viewChooseAction() string {

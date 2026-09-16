@@ -114,7 +114,9 @@ supports the same add/edit/delete/apply workflow as single-repo mode. Press
 edit, `x` exports every loaded repo and its values—including a `repo_url`
 column—to a timestamped CSV in the current directory, `F5` re-fetches every repo from GitHub (discarding
 nothing — batch mode never stages unapplied edits), and `q` quits from the
-table.
+table. Press `u` to unload the selected repo from the active list; after
+confirmation it is excluded from future bulk edits and refreshes for the
+current session.
 
 The metadata columns are `owner`, `repo`, and `repo_url`. If a custom
 property has the same name as one of those columns, its CSV header is

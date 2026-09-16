@@ -65,6 +65,72 @@ func TestBatchModel_TableScrollsWhenTerminalIsShort(t *testing.T) {
 	}
 }
 
+func TestBatchModel_TableHasHeadersAndScrollsHorizontally(t *testing.T) {
+	rows := []repoRow{
+		{
+			owner: "acme",
+			repo:  "service-one",
+			properties: []ghclient.PropertyValue{
+				{Name: "data-classification", Value: "confidential"},
+				{Name: "deployment-environment", Value: "production"},
+				{Name: "service-owner", Value: "platform-engineering"},
+			},
+		},
+	}
+	m := newTableModel(t, &fakeAPI{}, rows, nil)
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	m = next.(*batchModel)
+
+	initial := m.View()
+	if !strings.Contains(initial, "Repository") || !strings.Contains(initial, "data-classification") {
+		t.Fatalf("initial table is missing column headers:\n%s", initial)
+	}
+	if !strings.Contains(initial, "service-one") || !strings.Contains(initial, "confidential") {
+		t.Fatalf("initial table is missing aligned row values:\n%s", initial)
+	}
+	if !strings.Contains(initial, "›") {
+		t.Fatalf("wide table is missing its right overflow indicator:\n%s", initial)
+	}
+
+	for i := 0; i < 20; i++ {
+		next, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+		m = next.(*batchModel)
+	}
+	if m.horizontal == 0 {
+		t.Fatal("right arrow did not move the horizontal viewport")
+	}
+	scrolled := m.View()
+	if scrolled == initial || !strings.Contains(scrolled, "‹") {
+		t.Fatalf("table did not render its horizontally scrolled state:\n%s", scrolled)
+	}
+	if !strings.Contains(scrolled, "Status") {
+		t.Fatalf("rightmost column is not visible after scrolling to the end:\n%s", scrolled)
+	}
+
+	for i := 0; i < 20; i++ {
+		next, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+		m = next.(*batchModel)
+	}
+	if m.horizontal != 0 {
+		t.Fatalf("left arrow offset = %d, want 0", m.horizontal)
+	}
+}
+
+func TestRenderTableRow_TruncatesRepositoryFromLeft(t *testing.T) {
+	columns := []tableColumn{{name: "Repository", width: 20, truncateFromLeft: true}}
+	got := renderTableRow(columns, []string{"acme/a-very-long-repository-name"})
+
+	if !strings.HasPrefix(got, "...") {
+		t.Fatalf("renderTableRow() = %q, want a leading ellipsis", got)
+	}
+	if !strings.HasSuffix(got, "repository-name") {
+		t.Fatalf("renderTableRow() = %q, want the repository-name suffix preserved", got)
+	}
+	if len([]rune(got)) != columns[0].width {
+		t.Fatalf("rendered width = %d, want %d", len([]rune(got)), columns[0].width)
+	}
+}
+
 func TestBatchModel_FooterPinnedToLastRow(t *testing.T) {
 	m := newTableModel(t, &fakeAPI{}, manyRows(3), nil)
 
@@ -142,6 +208,62 @@ func TestBatchModel_F5Refetches(t *testing.T) {
 	}
 	if api.getCallsCount != 2 {
 		t.Errorf("getCallsCount = %d, want 2 (one per row)", api.getCallsCount)
+	}
+}
+
+func TestBatchModel_UnloadRemovesRepoFromActiveList(t *testing.T) {
+	api := &fakeAPI{}
+	rows := []repoRow{
+		{owner: "acme", repo: "one"},
+		{owner: "acme", repo: "two"},
+	}
+	m := newTableModel(t, api, rows, nil)
+
+	next, _ := m.Update(runeKey('u'))
+	m = settleBatch(next.(*batchModel))
+	if m.screen != bScreenConfirmUnload || m.pendingUnloadAt != 0 {
+		t.Fatalf("after unload command: screen=%v pending=%d, want confirmation for first row", m.screen, m.pendingUnloadAt)
+	}
+	if !strings.Contains(m.View(), "Unload acme/one") {
+		t.Fatalf("confirmation view missing selected repo:\n%s", m.View())
+	}
+
+	next, _ = m.Update(runeKey('n'))
+	m = next.(*batchModel)
+	if len(m.rows) != 2 || m.screen != bScreenTable {
+		t.Fatalf("after cancel: rows=%d screen=%v, want 2/table", len(m.rows), m.screen)
+	}
+
+	next, _ = m.Update(runeKey('u'))
+	m = settleBatch(next.(*batchModel))
+	next, _ = m.Update(runeKey('y'))
+	m = next.(*batchModel)
+	if len(m.rows) != 1 || m.rows[0].repo != "two" {
+		t.Fatalf("after confirm: rows=%v, want only acme/two", m.rows)
+	}
+	if len(m.entries) != 1 || m.entries[0].Repo != "two" {
+		t.Fatalf("after confirm: entries=%v, want only acme/two", m.entries)
+	}
+
+	// A refresh must not reintroduce the unloaded repo.
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyF5})
+	m = next.(*batchModel)
+	if cmd == nil || len(m.entries) != 1 {
+		t.Fatalf("after refresh: cmd=%v entries=%v, want one retained entry", cmd != nil, m.entries)
+	}
+}
+
+func TestBatchModel_RefreshWithNoActiveReposReturnsToTable(t *testing.T) {
+	m := newTableModel(t, &fakeAPI{}, []repoRow{{owner: "acme", repo: "one"}}, nil)
+	next, _ := m.Update(runeKey('u'))
+	m = settleBatch(next.(*batchModel))
+	next, _ = m.Update(runeKey('y'))
+	m = next.(*batchModel)
+
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyF5})
+	m = next.(*batchModel)
+	if cmd != nil || m.screen != bScreenTable || len(m.rows) != 0 {
+		t.Fatalf("refresh with no repos: cmd=%v screen=%v rows=%d, want nil/table/0", cmd != nil, m.screen, len(m.rows))
 	}
 }
 

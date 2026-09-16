@@ -59,6 +59,7 @@ const (
 	bScreenLoading batchScreen = iota
 	bScreenTable
 	bScreenDetail
+	bScreenConfirmUnload
 	bScreenChooseAction
 	bScreenChooseProperty
 	bScreenChooseTargets
@@ -143,8 +144,9 @@ type batchModel struct {
 	// detail reuses the single-repository property editor for the selected
 	// row. It is kept here so the batch table can receive the saved values
 	// when the detail screen is dismissed.
-	detail    *singleRepoModel
-	detailRow int
+	detail          *singleRepoModel
+	detailRow       int
+	pendingUnloadAt int
 }
 
 func newBatchModel(api ghclient.PropertiesAPI, backupDir string, entries []repolist.Entry, skipped []repolist.Skipped) *batchModel {
@@ -176,6 +178,10 @@ func (m *batchModel) startFetch() tea.Cmd {
 
 	chunks := chunkEntries(m.entries, batchFetchWorkers)
 	m.chunksTotal = len(chunks)
+	if m.chunksTotal == 0 {
+		m.screen = bScreenTable
+		return nil
+	}
 	cmds := make([]tea.Cmd, 0, len(chunks)+1)
 	cmds = append(cmds, m.spin.Tick)
 	for _, c := range chunks {
@@ -324,6 +330,8 @@ func (m *batchModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleTableKey(msg)
 	case bScreenDetail:
 		return m, nil
+	case bScreenConfirmUnload:
+		return m.handleConfirmUnloadKey(msg)
 	case bScreenChooseAction:
 		return m.handleChooseActionKey(msg)
 	case bScreenChooseProperty:
@@ -457,8 +465,52 @@ func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.screen = bScreenExporting
 			return m, m.exportCmd()
 		})
+	case s == "u" || s == "alt+u":
+		if m.cursor < 0 || m.cursor >= len(indices) {
+			return m, nil
+		}
+		rowIndex := indices[m.cursor]
+		return m.deferAction("u", func() (tea.Model, tea.Cmd) {
+			m.pendingUnloadAt = rowIndex
+			m.screen = bScreenConfirmUnload
+			return m, nil
+		})
 	}
 	return m, nil
+}
+
+func (m *batchModel) handleConfirmUnloadKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "enter":
+		m.unloadRow(m.pendingUnloadAt)
+		m.pendingUnloadAt = -1
+		m.screen = bScreenTable
+	case "n", "esc":
+		m.pendingUnloadAt = -1
+		m.screen = bScreenTable
+	}
+	return m, nil
+}
+
+func (m *batchModel) unloadRow(rowIndex int) {
+	if rowIndex < 0 || rowIndex >= len(m.rows) {
+		return
+	}
+	row := m.rows[rowIndex]
+	rows := make([]repoRow, 0, len(m.rows)-1)
+	rows = append(rows, m.rows[:rowIndex]...)
+	rows = append(rows, m.rows[rowIndex+1:]...)
+	m.rows = rows
+	entries := make([]repolist.Entry, 0, len(m.entries))
+	for _, entry := range m.entries {
+		if entry.Owner != row.owner || entry.Repo != row.repo {
+			entries = append(entries, entry)
+		}
+	}
+	m.entries = entries
+	if indices := m.filteredRowIndices(); m.cursor >= len(indices) && m.cursor > 0 {
+		m.cursor = len(indices) - 1
+	}
 }
 
 type batchExportedMsg struct {
@@ -842,8 +894,18 @@ func (m *batchModel) viewBody() string {
 		return fmt.Sprintf("\n  %s Exporting %d repo(s)...\n", m.spin.View(), len(m.rows))
 	case bScreenExportResult:
 		return m.viewExportResult()
+	case bScreenConfirmUnload:
+		return m.viewConfirmUnload()
 	}
 	return ""
+}
+
+func (m *batchModel) viewConfirmUnload() string {
+	if m.pendingUnloadAt < 0 || m.pendingUnloadAt >= len(m.rows) {
+		return ""
+	}
+	return warnStyle.Render(fmt.Sprintf("Unload %s from the active repo list?", m.rows[m.pendingUnloadAt].label())) + "\n\n" +
+		helpLine(keyBinding("y/enter", "confirm"), keyBinding("n/esc", "cancel"))
 }
 
 func (m *batchModel) viewExportResult() string {

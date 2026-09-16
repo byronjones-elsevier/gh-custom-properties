@@ -145,6 +145,62 @@ func TestBatchModel_F5Refetches(t *testing.T) {
 	}
 }
 
+func TestBatchModel_UnloadRemovesRepoFromActiveList(t *testing.T) {
+	api := &fakeAPI{}
+	rows := []repoRow{
+		{owner: "acme", repo: "one"},
+		{owner: "acme", repo: "two"},
+	}
+	m := newTableModel(t, api, rows, nil)
+
+	next, _ := m.Update(runeKey('u'))
+	m = settleBatch(next.(*batchModel))
+	if m.screen != bScreenConfirmUnload || m.pendingUnloadAt != 0 {
+		t.Fatalf("after unload command: screen=%v pending=%d, want confirmation for first row", m.screen, m.pendingUnloadAt)
+	}
+	if !strings.Contains(m.View(), "Unload acme/one") {
+		t.Fatalf("confirmation view missing selected repo:\n%s", m.View())
+	}
+
+	next, _ = m.Update(runeKey('n'))
+	m = next.(*batchModel)
+	if len(m.rows) != 2 || m.screen != bScreenTable {
+		t.Fatalf("after cancel: rows=%d screen=%v, want 2/table", len(m.rows), m.screen)
+	}
+
+	next, _ = m.Update(runeKey('u'))
+	m = settleBatch(next.(*batchModel))
+	next, _ = m.Update(runeKey('y'))
+	m = next.(*batchModel)
+	if len(m.rows) != 1 || m.rows[0].repo != "two" {
+		t.Fatalf("after confirm: rows=%v, want only acme/two", m.rows)
+	}
+	if len(m.entries) != 1 || m.entries[0].Repo != "two" {
+		t.Fatalf("after confirm: entries=%v, want only acme/two", m.entries)
+	}
+
+	// A refresh must not reintroduce the unloaded repo.
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyF5})
+	m = next.(*batchModel)
+	if cmd == nil || len(m.entries) != 1 {
+		t.Fatalf("after refresh: cmd=%v entries=%v, want one retained entry", cmd != nil, m.entries)
+	}
+}
+
+func TestBatchModel_RefreshWithNoActiveReposReturnsToTable(t *testing.T) {
+	m := newTableModel(t, &fakeAPI{}, []repoRow{{owner: "acme", repo: "one"}}, nil)
+	next, _ := m.Update(runeKey('u'))
+	m = settleBatch(next.(*batchModel))
+	next, _ = m.Update(runeKey('y'))
+	m = next.(*batchModel)
+
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyF5})
+	m = next.(*batchModel)
+	if cmd != nil || m.screen != bScreenTable || len(m.rows) != 0 {
+		t.Fatalf("refresh with no repos: cmd=%v screen=%v rows=%d, want nil/table/0", cmd != nil, m.screen, len(m.rows))
+	}
+}
+
 func TestBatchModel_FilterNarrowsTable(t *testing.T) {
 	rows := []repoRow{
 		{owner: "acme", repo: "alpha"},

@@ -65,6 +65,72 @@ func TestBatchModel_TableScrollsWhenTerminalIsShort(t *testing.T) {
 	}
 }
 
+func TestBatchModel_TableHasHeadersAndScrollsHorizontally(t *testing.T) {
+	rows := []repoRow{
+		{
+			owner: "acme",
+			repo:  "service-one",
+			properties: []ghclient.PropertyValue{
+				{Name: "data-classification", Value: "confidential"},
+				{Name: "deployment-environment", Value: "production"},
+				{Name: "service-owner", Value: "platform-engineering"},
+			},
+		},
+	}
+	m := newTableModel(t, &fakeAPI{}, rows, nil)
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	m = next.(*batchModel)
+
+	initial := m.View()
+	if !strings.Contains(initial, "Repository") || !strings.Contains(initial, "data-classification") {
+		t.Fatalf("initial table is missing column headers:\n%s", initial)
+	}
+	if !strings.Contains(initial, "service-one") || !strings.Contains(initial, "confidential") {
+		t.Fatalf("initial table is missing aligned row values:\n%s", initial)
+	}
+	if !strings.Contains(initial, "›") {
+		t.Fatalf("wide table is missing its right overflow indicator:\n%s", initial)
+	}
+
+	for i := 0; i < 20; i++ {
+		next, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+		m = next.(*batchModel)
+	}
+	if m.horizontal == 0 {
+		t.Fatal("right arrow did not move the horizontal viewport")
+	}
+	scrolled := m.View()
+	if scrolled == initial || !strings.Contains(scrolled, "‹") {
+		t.Fatalf("table did not render its horizontally scrolled state:\n%s", scrolled)
+	}
+	if !strings.Contains(scrolled, "Status") {
+		t.Fatalf("rightmost column is not visible after scrolling to the end:\n%s", scrolled)
+	}
+
+	for i := 0; i < 20; i++ {
+		next, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+		m = next.(*batchModel)
+	}
+	if m.horizontal != 0 {
+		t.Fatalf("left arrow offset = %d, want 0", m.horizontal)
+	}
+}
+
+func TestRenderTableRow_TruncatesRepositoryFromLeft(t *testing.T) {
+	columns := []tableColumn{{name: "Repository", width: 20, truncateFromLeft: true}}
+	got := renderTableRow(columns, []string{"acme/a-very-long-repository-name"})
+
+	if !strings.HasPrefix(got, "...") {
+		t.Fatalf("renderTableRow() = %q, want a leading ellipsis", got)
+	}
+	if !strings.HasSuffix(got, "repository-name") {
+		t.Fatalf("renderTableRow() = %q, want the repository-name suffix preserved", got)
+	}
+	if len([]rune(got)) != columns[0].width {
+		t.Fatalf("rendered width = %d, want %d", len([]rune(got)), columns[0].width)
+	}
+}
+
 func TestBatchModel_FooterPinnedToLastRow(t *testing.T) {
 	m := newTableModel(t, &fakeAPI{}, manyRows(3), nil)
 

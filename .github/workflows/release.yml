@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Validate
+        run: |
+          make fmt/check
+          make vet
+          make test
+      - name: Build packages
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${VERSION#v}"
+          mkdir -p dist
+
+          for target in \
+            darwin/amd64 \
+            darwin/arm64 \
+            linux/amd64 \
+            linux/arm64 \
+            windows/amd64 \
+            windows/arm64
+          do
+            IFS=/ read -r goos goarch <<< "$target"
+            package="gh-custom-properties_${version}_${goos}_${goarch}"
+            binary="gh-custom-properties"
+            if [[ "$goos" == "windows" ]]; then
+              binary="${binary}.exe"
+            fi
+
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+              go build -trimpath -ldflags="-s -w" -o "dist/$binary" .
+            if [[ "$goos" == "windows" ]]; then
+              zip -j "dist/${package}.zip" "dist/$binary"
+            else
+              tar -C dist -czf "dist/${package}.tar.gz" "$binary"
+            fi
+            rm "dist/$binary"
+          done
+
+          sha256sum dist/*.tar.gz dist/*.zip > dist/checksums.txt
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${GITHUB_REF_NAME}"
+          dist/*.tar.gz dist/*.zip dist/checksums.txt
+          --verify-tag
+          --generate-notes
+          --title "${GITHUB_REF_NAME}"

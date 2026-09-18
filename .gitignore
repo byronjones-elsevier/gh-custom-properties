@@ -2,4 +2,6 @@
 /dist/
 *.test
 *.out
+repo*.txt
+custom-properties-*.csv
 .DS_Store

@@ -39,10 +39,14 @@ var GHCustomProperties = Spec{
 	Usage: []string{
 		"gh-custom-properties [flags] [owner/repo | repo-url]",
 		"gh-custom-properties --file repos.txt [flags]",
+		"gh-custom-properties --list [flags] owner/repo",
+		"gh-custom-properties --set name=value [--set name=value ...] [flags] owner/repo",
 	},
 	Note: "If no repo argument or --file is given, the TUI prompts for a repo to load.",
 	Flags: []Flag{
 		{Names: []string{"f", "file"}, ValuePlaceholder: "path", Description: "batch mode: file listing one repo (owner/repo or URL) per line"},
+		{Names: []string{"list"}, Description: "non-interactive: print the repo's custom properties as name=value lines and exit"},
+		{Names: []string{"set"}, ValuePlaceholder: "name=value", Description: "non-interactive: set a property on the repo; repeat for multiple. Multi-select values are comma-separated; an empty value clears the property"},
 		{Names: []string{"t", "token"}, ValuePlaceholder: "token", Description: "GitHub token, overriding GITHUB_TOKEN / `gh auth token`"},
 		{Names: []string{"backup-dir"}, ValuePlaceholder: "path", Description: "directory to write timestamped backups to (default $HOME/.gh-custom-properties/backups)"},
 		{Names: []string{"h", "H", "help", "HELP", "?"}, Description: "show help"},
@@ -62,6 +66,17 @@ var GHCustomProperties = Spec{
 			Title: "REPO LIST FILE FORMAT (--file)",
 			Body: "One repo per line, as \"owner/repo\" or a github.com URL. Blank lines and\n" +
 				"lines starting with '#' are ignored.",
+		},
+		{
+			Title: "NON-INTERACTIVE MODE (--list, --set)",
+			Body: "Both require a repo argument and cannot be combined with --file. With\n" +
+				"both, --set is applied first and the updated properties are listed.\n" +
+				"Values are validated against the org's property schema when readable\n" +
+				"(unknown names, disallowed select values, non-boolean true_false values,\n" +
+				"and clearing required properties are rejected before anything is written).\n" +
+				"--list output goes to stdout; --set progress and the backup path go to stderr.\n\n" +
+				"Example:\n" +
+				"  gh-custom-properties --set team=platform --set tags=a,b --list my-org/my-repo",
 		},
 		{
 			Title: "BACKUPS",

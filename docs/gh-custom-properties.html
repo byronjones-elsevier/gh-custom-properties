@@ -21,12 +21,16 @@
 <h2>Usage</h2>
 <pre>gh-custom-properties [flags] [owner/repo | repo-url]
 gh-custom-properties --file repos.txt [flags]
+gh-custom-properties --list [flags] owner/repo
+gh-custom-properties --set name=value [--set name=value ...] [flags] owner/repo
 </pre>
 <p>If no repo argument or --file is given, the TUI prompts for a repo to load.</p>
 
 <h2>Flags</h2>
 <table>
 <tr><td class="flag">-f, --file &lt;path&gt;</td><td>batch mode: file listing one repo (owner/repo or URL) per line</td></tr>
+<tr><td class="flag">--list</td><td>non-interactive: print the repo&#39;s custom properties as name=value lines and exit</td></tr>
+<tr><td class="flag">--set &lt;name=value&gt;</td><td>non-interactive: set a property on the repo; repeat for multiple. Multi-select values are comma-separated; an empty value clears the property</td></tr>
 <tr><td class="flag">-t, --token &lt;token&gt;</td><td>GitHub token, overriding GITHUB_TOKEN / `gh auth token`</td></tr>
 <tr><td class="flag">--backup-dir &lt;path&gt;</td><td>directory to write timestamped backups to (default $HOME/.gh-custom-properties/backups)</td></tr>
 <tr><td class="flag">-h, -H, -?, --help, --HELP</td><td>show help</td></tr>
@@ -44,6 +48,16 @@ target repos, and to read the org&#39;s custom-property schema.</pre>
 <h2>REPO LIST FILE FORMAT (--file)</h2>
 <pre>One repo per line, as &#34;owner/repo&#34; or a github.com URL. Blank lines and
 lines starting with &#39;#&#39; are ignored.</pre>
+<h2>NON-INTERACTIVE MODE (--list, --set)</h2>
+<pre>Both require a repo argument and cannot be combined with --file. With
+both, --set is applied first and the updated properties are listed.
+Values are validated against the org&#39;s property schema when readable
+(unknown names, disallowed select values, non-boolean true_false values,
+and clearing required properties are rejected before anything is written).
+--list output goes to stdout; --set progress and the backup path go to stderr.
+
+Example:
+  gh-custom-properties --set team=platform --set tags=a,b --list my-org/my-repo</pre>
 <h2>BACKUPS</h2>
 <pre>Before any change is applied, a timestamped JSON snapshot of the prior
 property values is written to the backup directory.</pre>

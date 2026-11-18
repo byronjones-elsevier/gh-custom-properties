@@ -33,8 +33,8 @@ type Spec struct {
 // GHCustomProperties is the CLI spec for the gh-custom-properties command.
 var GHCustomProperties = Spec{
 	Name:    "gh-custom-properties",
-	Version: "1.0",
-	Date:    "2026-09-16",
+	Version: "1.1",
+	Date:    "2026-11-18",
 	Summary: "view, add, edit, and delete GitHub custom repo properties",
 	Usage: []string{
 		"gh-custom-properties [flags] [owner/repo | repo-url]",

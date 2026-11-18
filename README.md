@@ -61,6 +61,23 @@ gh-custom-properties octocat/hello-world
 gh-custom-properties https://github.com/octocat/hello-world
 ```
 
+Non-interactive (no TUI), for scripting:
+
+```sh
+gh-custom-properties --list octocat/hello-world
+gh-custom-properties --set team=platform --set tags=a,b octocat/hello-world
+gh-custom-properties --set team=platform --list octocat/hello-world
+```
+
+`--list` prints one `name=value` line per property (multi-select values are
+comma-joined). `--set name=value` is repeatable; an empty value (`team=`)
+clears the property. When the org schema is readable, values are validated
+first (unknown names, disallowed select options, non-boolean `true_false`
+values, clearing a required property) and nothing is written on error. A
+backup is written before any change, as in the TUI. `--list` output goes to
+stdout; `--set` progress and the backup path go to stderr. Both require a repo
+argument and can't be combined with `--file`.
+
 Within the single-repo screen:
 
 | Key | Action |

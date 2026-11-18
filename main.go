@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/clidoc"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/config"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/ghclient"
+	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/headless"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/repolist"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/termkeys"
 	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/tui"
@@ -34,6 +36,18 @@ func run(args []string) int {
 		return 1
 	}
 
+	headlessMode := opts.list || len(opts.set) > 0
+	if headlessMode {
+		if opts.filePath != "" {
+			fmt.Fprintln(os.Stderr, "error: --list/--set cannot be combined with --file")
+			return 1
+		}
+		if opts.repoArg == "" {
+			fmt.Fprintln(os.Stderr, "error: --list/--set require a repo argument (owner/repo or URL)")
+			return 1
+		}
+	}
+
 	cfg, err := config.Load(config.EnvOverrides(), config.Overrides{
 		BackupDir: opts.backupDir,
 		Token:     opts.token,
@@ -49,6 +63,23 @@ func run(args []string) int {
 		return 1
 	}
 	api := ghclient.New(token)
+
+	if headlessMode {
+		owner, repo, err := ghclient.ParseRepoSpec(opts.repoArg)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			return 1
+		}
+		err = headless.Run(context.Background(), api, headless.Options{
+			Owner: owner, Repo: repo,
+			List: opts.list, Set: opts.set, BackupDir: cfg.BackupDir,
+		}, os.Stdout, os.Stderr)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			return 1
+		}
+		return 0
+	}
 
 	tui.ApplyPalette(tui.Palette{
 		Title:    cfg.Colors.Title,
@@ -107,6 +138,22 @@ type cliOptions struct {
 	token     string
 	backupDir string
 	repoArg   string
+	list      bool
+	set       []headless.Assignment
+}
+
+// setFlag collects repeatable --set name=value flags.
+type setFlag struct{ dst *[]headless.Assignment }
+
+func (f setFlag) String() string { return "" }
+
+func (f setFlag) Set(v string) error {
+	a, err := headless.ParseAssignment(v)
+	if err != nil {
+		return err
+	}
+	*f.dst = append(*f.dst, a)
+	return nil
 }
 
 // parseArgs parses args and returns the resolved options. done is true when
@@ -128,6 +175,8 @@ func parseArgs(args []string) (cliOptions, int, bool) {
 	fs.StringVar(&opts.token, "token", "", "")
 	fs.StringVar(&opts.token, "t", "", "")
 	fs.StringVar(&opts.backupDir, "backup-dir", "", "")
+	fs.BoolVar(&opts.list, "list", false, "")
+	fs.Var(setFlag{&opts.set}, "set", "")
 	fs.BoolVar(&help, "help", false, "")
 	fs.BoolVar(&help, "h", false, "")
 	fs.BoolVar(&help, "H", false, "")

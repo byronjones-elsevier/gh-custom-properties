@@ -31,6 +31,9 @@ People:
   a whole, markdownlint.
 - Notes: the spec describes the behavior of the three feature branches below as
   merged; see HANDOFF "Resume here".
+  Update 2026-11-23T15:00:00Z: the owner ran `make vuln`; govulncheck v1.1.4
+  works and reported one standard-library finding fixed in a newer Go patch
+  release (tracked as H-5). It found nothing in module dependencies.
 
 ---
 ### fix/single-delete-clears: single-repo delete now clears on GitHub

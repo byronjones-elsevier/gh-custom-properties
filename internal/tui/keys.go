@@ -3,6 +3,7 @@ package tui
 import (
 	"time"
 
+	"github.com/ByronJones-Elsevier/gh-custom-properties/internal/browser"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -16,6 +17,7 @@ type listKeyMap struct {
 	Edit   key.Binding
 	Delete key.Binding
 	Save   key.Binding
+	Open   key.Binding
 	Cancel key.Binding
 	Quit   key.Binding
 }
@@ -34,6 +36,7 @@ func defaultListKeyMap() listKeyMap {
 		Edit:   key.NewBinding(key.WithKeys("enter", "e", "alt+e"), key.WithHelp("enter/e", "edit")),
 		Delete: key.NewBinding(key.WithKeys("d", "alt+d"), key.WithHelp("d", "delete")),
 		Save:   key.NewBinding(key.WithKeys("s", "alt+s"), key.WithHelp("s", "apply changes")),
+		Open:   key.NewBinding(key.WithKeys("o", "alt+o"), key.WithHelp("o", "open in browser")),
 		Cancel: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
 		Quit:   key.NewBinding(key.WithKeys("q", "alt+q"), key.WithHelp("q", "quit")),
 	}
@@ -93,4 +96,15 @@ func flashTick() tea.Cmd {
 type pendingFlash struct {
 	label  string
 	action func() (tea.Model, tea.Cmd)
+}
+
+// browserOpenedMsg reports the outcome of launching the web browser.
+type browserOpenedMsg struct{ err error }
+
+// openBrowserCmd opens the repo's Custom properties settings page in the
+// default web browser.
+func openBrowserCmd(owner, repo string) tea.Cmd {
+	return func() tea.Msg {
+		return browserOpenedMsg{err: browser.Open(browser.SettingsURL(owner, repo))}
+	}
 }

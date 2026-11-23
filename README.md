@@ -88,6 +88,7 @@ Within the single-repo screen:
 | `enter`/`e` | edit the selected property's value |
 | `d` | delete the selected property (confirm with `y`) |
 | `s` | apply all changes (writes a backup first, then patches GitHub) |
+| `o` | open the repo's Custom properties settings page in your web browser |
 | `?` | filter the list by name (typing narrows it live; `esc` clears) |
 | `q` | quit (confirm with `y`/`enter`; any other key cancels) |
 
@@ -128,7 +129,8 @@ table by `owner/repo`. The individual screen shows every field defined by
 the organization schema, including fields that are currently unset, and
 supports the same add/edit/delete/apply workflow as single-repo mode. Press
 `esc` or `q` to return to the repo table without saving. `b` starts a bulk
-edit, `x` exports every loaded repo and its values—including a `repo_url`
+edit, `o` opens the selected repo's Custom properties settings page in your
+web browser, `x` exports every loaded repo and its values—including a `repo_url`
 column—to a timestamped CSV in the current directory, `F5` re-fetches every repo from GitHub (discarding
 nothing — batch mode never stages unapplied edits), and `q` quits from the
 table. Press `u` to unload the selected repo from the active list; after
@@ -153,7 +155,7 @@ These work on every screen, in both modes:
 
 \* `q` only means quit on the property list / repo table screens — elsewhere (e.g. typing a repo name or a property value) it's just the letter q. `ctrl+q` is intercepted by some terminals for flow control; `ctrl+c` is the more universally reliable path.
 
-Every custom command above (`a`/`e`/`d`/`s`/`q`/`b`) also matches
+Every custom command above (`a`/`e`/`d`/`s`/`o`/`q`/`b`) also matches
 `alt+<letter>`, honoring the equivalent of the common "Alt-key shortcut"
 terminal convention. This only does something on terminals that support
 the [Kitty keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/)

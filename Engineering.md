@@ -16,6 +16,9 @@ internal/
   knownprops/             Elsevier-specific format validators (email/date/
                           alphanumeric) for string-typed properties, keyed
                           by property name
+  browser/                builds a repo's github.com Custom properties
+                          settings URL and opens it in the default browser
+                          (`o` key on the single-repo and batch screens)
   termkeys/               optional Kitty-keyboard-protocol detection, so
                           Alt+letter commands work where the terminal
                           supports it (see "Alt-key commands" below)

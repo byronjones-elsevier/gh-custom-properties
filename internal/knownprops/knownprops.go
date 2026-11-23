@@ -21,26 +21,38 @@ type Kind string
 
 const (
 	Alphanumeric Kind = "alphanumeric"
-	Email        Kind = "email"
-	Date         Kind = "date" // YYYY-MM-DD
+	// OptionalAlphanumeric is Alphanumeric, except that an empty value is
+	// also accepted; callers treat a blank as "unset this property"
+	// (see AllowsBlank).
+	OptionalAlphanumeric Kind = "alphanumeric-or-blank"
+	Email                Kind = "email"
+	Date                 Kind = "date" // YYYY-MM-DD
 )
 
 // Validators maps Elsevier's standard custom-property names to the format
 // their value must satisfy.
 var Validators = map[string]Kind{
-	"CostCode":           Alphanumeric,
-	"SystemID":           Alphanumeric,
-	"SystemName":         Alphanumeric,
+	"CostCode":           OptionalAlphanumeric,
+	"SystemID":           OptionalAlphanumeric,
+	"SystemName":         OptionalAlphanumeric,
 	"owner":              Email,
 	"MigrationReadyDate": Date,
 }
 
 var alphanumericPattern = regexp.MustCompile(`^[A-Za-z0-9]+$`)
 
+// AllowsBlank reports whether an empty value is valid for kind. A blank for
+// such a property means "unset it", not "set it to an empty string".
+func AllowsBlank(kind Kind) bool { return kind == OptionalAlphanumeric }
+
 // Validate reports whether value satisfies kind, returning a human-readable
 // error describing the expected format when it doesn't.
 func Validate(kind Kind, value string) error {
 	switch kind {
+	case OptionalAlphanumeric:
+		if value != "" && !alphanumericPattern.MatchString(value) {
+			return fmt.Errorf("must be blank, or alphanumeric (letters and digits only)")
+		}
 	case Alphanumeric:
 		if !alphanumericPattern.MatchString(value) {
 			return fmt.Errorf("must be alphanumeric (letters and digits only)")

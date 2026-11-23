@@ -335,7 +335,18 @@ func (e *valueEditor) Result() ghclient.PropertyValue {
 		}
 		return ghclient.PropertyValue{Name: e.name, Value: e.picker.selectedValue()}
 	}
-	return ghclient.PropertyValue{Name: e.name, Value: e.stringInput.Value()}
+	v := e.stringInput.Value()
+	if v == "" && e.blankClears() {
+		return ghclient.PropertyValue{Name: e.name, Value: nil}
+	}
+	return ghclient.PropertyValue{Name: e.name, Value: v}
+}
+
+// blankClears reports whether a blank value for the property being edited
+// means "unset it" (the Elsevier standard string properties that allow blank).
+func (e *valueEditor) blankClears() bool {
+	kind, ok := knownprops.Validators[e.name]
+	return ok && knownprops.AllowsBlank(kind)
 }
 
 func (e *valueEditor) View() string {
@@ -395,6 +406,9 @@ func (e *valueEditor) View() string {
 		b.WriteString("Value: " + e.stringInput.View() + "\n")
 		if e.validationErr != nil {
 			b.WriteString(errorStyle.Render(e.validationErr.Error()) + "\n")
+		}
+		if e.blankClears() {
+			b.WriteString(dimStyle.Render("Leave blank and press enter to unset this property.") + "\n")
 		}
 		b.WriteString("\n" + helpLine(
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "confirm")),

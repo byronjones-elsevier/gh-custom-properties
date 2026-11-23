@@ -12,7 +12,7 @@ func renderHelpScreen() string {
 	b.WriteString(headerStyle.Render("Global") + "\n")
 	b.WriteString("  F1                    show/close this help\n")
 	b.WriteString("  F5                    refresh from GitHub\n")
-	b.WriteString("  ctrl+c / ctrl+q / q   quit (asks to confirm)\n")
+	b.WriteString("  ctrl+c / q            quit (asks to confirm)\n")
 	b.WriteString("  pgup/pgdn, f7/f8,\n")
 	b.WriteString("  shift+up/shift+down   page through long lists\n")
 	b.WriteString("  left/right            scroll table columns\n")

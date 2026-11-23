@@ -91,3 +91,12 @@ func TestApp_MinimumSizeWarning(t *testing.T) {
 		t.Errorf("did not expect a too-small warning at 80x24:\n%s", a.View())
 	}
 }
+
+func TestIsQuitIntentKey_CtrlQIsReservedForFlowControl(t *testing.T) {
+	if isQuitIntentKey(tea.KeyMsg{Type: tea.KeyCtrlQ}) {
+		t.Error("ctrl+q must not be a quit key (reserved for XON/XOFF flow control)")
+	}
+	if !isQuitIntentKey(tea.KeyMsg{Type: tea.KeyCtrlC}) {
+		t.Error("ctrl+c must remain a quit key")
+	}
+}

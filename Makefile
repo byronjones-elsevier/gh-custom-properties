@@ -6,8 +6,9 @@
 BINARY_NAME ?= gh-custom-properties
 GOFLAGS ?=
 ARGS ?=
+GOVULNCHECK_VERSION ?= v1.1.4
 
-.PHONY: default all deps build install run test test/cover vet fmt fmt/check lint docs/gen clean help
+.PHONY: default all deps build install run test test/cover vet fmt fmt/check lint vuln docs/gen changelog/status clean help
 
 default: help
 
@@ -55,6 +56,14 @@ fmt/check:
 ## Run golangci-lint (see https://golangci-lint.run/welcome/install/ if it's not installed)
 lint:
 	golangci-lint run ./...
+
+## Scan dependencies and the standard library for known vulnerabilities (needs network)
+vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
+
+## Print, from git and in UTC, the merge facts that CHANGELOG.md must not hold
+changelog/status:
+	@TZ=UTC git log --merges --first-parent main --format='%h %cd %s' --date=format-local:'%Y-%m-%dT%H:%M:%SZ'
 
 ## Regenerate docs/gh-custom-properties.1 and .html from internal/clidoc
 docs/gen:

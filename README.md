@@ -91,7 +91,7 @@ Within the single-repo screen:
 | `?` | filter the list by name (typing narrows it live; `esc` clears) |
 | `q` | quit (confirm with `y`/`enter`; any other key cancels) |
 
-See [Global keybindings](#global-keybindings) below for `F1`/`F5`/Ctrl-C/Ctrl-Q, which work on every screen.
+See [Global keybindings](#global-keybindings) below for `F1`/`F5`/Ctrl-C, which work on every screen.
 
 Batch mode, across a list of repos:
 
@@ -147,11 +147,11 @@ These work on every screen, in both modes:
 |---|---|
 | `F1` | show/close a keybinding reference |
 | `F5` | refresh from GitHub (property list / repo table only) |
-| `ctrl+c` / `ctrl+q` / `q`\* | quit — asks to confirm; a second press (or `y`/`enter`) confirms, any other key cancels |
+| `ctrl+c` / `q`\* | quit — asks to confirm; a second press (or `y`/`enter`) confirms, any other key cancels |
 | `tab` | in the add/edit editor, same as `enter` (confirm/advance) |
 | `shift+tab` | in the add editor's value step, go back and pick a different property |
 
-\* `q` only means quit on the property list / repo table screens — elsewhere (e.g. typing a repo name or a property value) it's just the letter q. `ctrl+q` is intercepted by some terminals for flow control; `ctrl+c` is the more universally reliable path.
+\* `q` only means quit on the property list / repo table screens — elsewhere (e.g. typing a repo name or a property value) it's just the letter q. `ctrl+q` is deliberately unbound: terminals use it for XON/XOFF flow control.
 
 Every custom command above (`a`/`e`/`d`/`s`/`q`/`b`) also matches
 `alt+<letter>`, honoring the equivalent of the common "Alt-key shortcut"

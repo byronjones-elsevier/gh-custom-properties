@@ -22,8 +22,7 @@ None beyond the branches listed in section 1.
 
 ## 4. Outstanding work
 
-| ID | Item | Why | Acceptance | Owner | Blocked by |
-| --- | --- | --- | --- | --- | --- |
+None. The one open decision is D-B below.
 
 ## 5. Decisions needed
 

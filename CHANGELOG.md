@@ -11,6 +11,17 @@ People:
   UI, including merge commits).
 
 ---
+### docs/handoff-cleanup: close out the standards work in HANDOFF
+
+- Branch: `docs/handoff-cleanup`, base `main`
+- Worked on by: Byron Jones (owner); Claude Sonnet 5.5 (Claude Code, author)
+- Written: 2026-11-23T17:00:00Z
+- What it did: removed the satisfied CI `vuln` item (H-5), reset the status and
+  resume sections now that the other branches have landed, and listed the merged
+  local branches as cleanup debt.
+- Verification: `go test ./...` (including the living-document drift test).
+
+---
 ### docs/agent-standards: adopt the house agent standards
 
 - Branch: `docs/agent-standards`, base `main`

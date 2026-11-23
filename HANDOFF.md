@@ -24,15 +24,11 @@ None beyond the branches listed in section 1.
 
 | ID | Item | Why | Acceptance | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- |
-| H-1 | Add a `LICENSE` file | `agents/git.md` requires one (MIT by default) | `LICENSE` present; `README.md` states it | Byron Jones | Decision D-A |
 | H-3 | Verify terminal restore on SIGINT/SIGTERM | Required by `agents/tui.md`; the project installs no handler | `kill -TERM` the running TUI and confirm the terminal is usable | Byron Jones | none |
 | H-6 | Test the real browser launcher on macOS, Linux, and Windows | Only the stubbed path is tested | `o` opens the page on each platform | Byron Jones | none |
 
 ## 5. Decisions needed
 
-- **D-A: license holder.** Options: MIT with "Elsevier" as holder; MIT with a
-  personal name; no license (private work repo). Recommendation: ask Elsevier
-  legal or the repo owner; do not guess a holder.
 - **D-B: GitHub Enterprise hosts.** The tool is hard-coded to `github.com` and
   `api.github.com`. If you use another host, the browser URL and API base need a
   setting. Recommendation: defer until needed.

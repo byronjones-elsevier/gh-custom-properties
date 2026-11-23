@@ -29,7 +29,7 @@ type batchTableHelpKeys struct{}
 
 func (batchTableHelpKeys) ShortHelp() []key.Binding {
 	return []key.Binding{
-		keyBinding("↑/↓", "rows"), keyBinding("←/→", "columns"), keyBinding("enter/e", "repo details"), keyBinding("b", "bulk edit"), keyBinding("u", "unload"), keyBinding("x", "export CSV"),
+		keyBinding("↑/↓", "rows"), keyBinding("←/→", "columns"), keyBinding("enter/e", "repo details"), keyBinding("b", "bulk edit"), keyBinding("u", "unload"), keyBinding("x", "export CSV"), keyBinding("o", "open in browser"),
 		keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help"),
 		keyBinding("q", "quit"),
 	}
@@ -40,7 +40,7 @@ func (batchTableHelpKeys) FullHelp() [][]key.Binding {
 		{keyBinding("↑/↓", "rows"), keyBinding("←/→", "columns")},
 		{keyBinding("enter/e", "repo details")},
 		{keyBinding("b", "bulk edit")},
-		{keyBinding("u", "unload"), keyBinding("x", "export CSV")},
+		{keyBinding("u", "unload"), keyBinding("x", "export CSV"), keyBinding("o", "open in browser")},
 		{keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help")},
 		{keyBinding("q", "quit")},
 	}
@@ -288,6 +288,9 @@ func (m *batchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.exportErr = msg.err
 		m.screen = bScreenExportResult
 		return m, nil
+	case browserOpenedMsg:
+		m.err = msg.err
+		return m, nil
 	case flashElapsedMsg:
 		if m.pendingFlash == nil {
 			return m, nil
@@ -477,6 +480,15 @@ func (m *batchModel) handleTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.deferAction("x", func() (tea.Model, tea.Cmd) {
 			m.screen = bScreenExporting
 			return m, m.exportCmd()
+		})
+	case s == "o" || s == "alt+o":
+		if m.cursor < 0 || m.cursor >= len(indices) {
+			return m, nil
+		}
+		row := m.rows[indices[m.cursor]]
+		m.err = nil
+		return m.deferAction("o", func() (tea.Model, tea.Cmd) {
+			return m, openBrowserCmd(row.owner, row.repo)
 		})
 	case s == "u" || s == "alt+u":
 		if m.cursor < 0 || m.cursor >= len(indices) {

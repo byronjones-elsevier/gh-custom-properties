@@ -19,10 +19,12 @@ func renderHelpScreen() string {
 	b.WriteString("  ?                     filter the current list\n\n")
 
 	b.WriteString(headerStyle.Render("Single-repo screen") + "\n")
-	b.WriteString("  a / e / d / s         add / edit / delete / apply changes\n\n")
+	b.WriteString("  a / e / d / s         add / edit / delete / apply changes\n")
+	b.WriteString("  o                     open repo's Custom properties page in browser\n\n")
 
 	b.WriteString(headerStyle.Render("Batch screen") + "\n")
 	b.WriteString("  b                     start a bulk edit\n")
+	b.WriteString("  o                     open selected repo's Custom properties page in browser\n")
 	b.WriteString("  space / a / n         toggle / select all / select none (target picker)\n\n")
 
 	b.WriteString(headerStyle.Render("Editing a value") + "\n")

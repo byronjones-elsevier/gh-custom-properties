@@ -474,8 +474,9 @@ Go 1.25 (`go.mod`). Direct dependencies (versions pinned in `go.mod`/`go.sum`):
 | `charmbracelet/bubbletea` v1.3.10 | TUI runtime |
 | `charmbracelet/bubbles` v1.0.0 | list/input/spinner/help/progress widgets |
 | `charmbracelet/lipgloss` v1.1.0 | styling (its color profile is expected to honor `NO_COLOR`; unverified, see HANDOFF H-2) |
-| `jejacks0n/bubbletea-menubar` | top bar (recorded as `// indirect` in `go.mod`; see HANDOFF H-4) |
-| `golang.org/x/term` | raw-mode probe for Alt-key detection (recorded as `// indirect` in `go.mod`; see HANDOFF H-4) |
+| `jejacks0n/bubbletea-menubar` | top bar |
+| `charmbracelet/x/ansi` | ANSI-aware string width/truncation in `internal/tui` |
+| `golang.org/x/term` | raw-mode probe for Alt-key detection |
 
 ## 10. Build, run, test, and release
 

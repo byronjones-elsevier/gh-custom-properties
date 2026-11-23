@@ -9,7 +9,7 @@ specification is [ENGINEERING.md](ENGINEERING.md).
 - In flight: `docs/agent-standards` (this branch), plus the local branches
   `feat/open-in-browser`, `feat/blank-clears-value`, and `fix/single-delete-clears`.
 - Verified 2026-11-23: `go vet`, `go test ./...`, and `golangci-lint run` pass on
-  each branch. `make vuln` ran on 2026-11-23 (see H-5). Not verified: `make all` end to end, markdownlint,
+  each branch. `make vuln` passed locally on 2026-11-23 and `go mod tidy` was run. Not verified: `make all` end to end, markdownlint,
   CI.
 
 ## 2. Resume here
@@ -33,8 +33,7 @@ None beyond the branches listed in section 1.
 | H-1 | Add a `LICENSE` file | `agents/git.md` requires one (MIT by default) | `LICENSE` present; `README.md` states it | Byron Jones | Decision D-A |
 | H-2 | Verify `NO_COLOR` is honored | `agents/tui.md` requires it; nothing in the code reads it, lipgloss may handle it | Run the TUI with `NO_COLOR=1` in a terminal and confirm no color; add a test if feasible (REQ-TUI-1) | Byron Jones | none |
 | H-3 | Verify terminal restore on SIGINT/SIGTERM | Required by `agents/tui.md`; the project installs no handler | `kill -TERM` the running TUI and confirm the terminal is usable | Byron Jones | none |
-| H-4 | Mark `bubbletea-menubar` and `golang.org/x/term` as direct dependencies | `go.mod` lists them `// indirect` although the code imports them | `go mod tidy` leaves no diff and they are in the direct block | Byron Jones | corporate proxy cert (see section 7) |
-| H-5 | Get `make vuln` to exit 0 | On 2026-11-23 it ran and reported GO-2026-6859 (`net/http`, standard library), found in go1.27.3 and fixed in go1.27.4; no module dependency is affected | Upgrade the local Go toolchain to 1.27.4 or newer (`brew upgrade go`) and rerun; then confirm the CI `vuln` job, whose Go version comes from `go.mod` (1.25.0) and may report its own standard-library findings, so decide whether to raise the `go` line or pin a patched toolchain in that job | Byron Jones | none |
+| H-5 | Confirm the CI `vuln` job passes | Locally `make vuln` reports no vulnerabilities (2026-11-23, after upgrading Go). CI takes its Go version from `go.mod` (1.25.0) and may report standard-library findings for that older release | CI `vuln` job green; if not, raise the `go` line in `go.mod` or pin a patched toolchain in that job | Byron Jones | none |
 | H-6 | Test the real browser launcher on macOS, Linux, and Windows | Only the stubbed path is tested | `o` opens the page on each platform | Byron Jones | none |
 
 ## 5. Decisions needed

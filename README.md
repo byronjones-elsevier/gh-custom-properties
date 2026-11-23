@@ -239,13 +239,15 @@ hex code (`"#ff69b4"`).
 
 ## Development
 
-See [Engineering.md](Engineering.md) for the package layout and design
-notes, and [AGENTS.md](AGENTS.md) for notes aimed at an AI coding agent
-picking this repo back up.
+See [ENGINEERING.md](ENGINEERING.md) for the specification, package layout,
+and design notes; [HANDOFF.md](HANDOFF.md) for outstanding work;
+[CHANGELOG.md](CHANGELOG.md) for history; and [AGENTS.md](AGENTS.md) for notes
+aimed at an AI coding agent picking this repo back up.
 
 ```sh
 make help   # list every target
 make all    # fmt/check, vet, lint, test, build — mirrors CI
+make vuln   # govulncheck (needs network)
 make build  # just build the binary
 make test   # just run the test suite
 make run ARGS="--file repos.txt"   # build and run with flags

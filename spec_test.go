@@ -22,9 +22,17 @@ func readDoc(t *testing.T, name string) string {
 func TestSpec_RequirementIDsAreUniqueAndReferencedFilesExist(t *testing.T) {
 	spec := readDoc(t, "ENGINEERING.md")
 
+	// Only the requirements table defines IDs; later tables refer to them.
+	start := strings.Index(spec, "## 2. Requirements")
+	end := strings.Index(spec, "## 3. External interfaces")
+	if start < 0 || end < start {
+		t.Fatal("ENGINEERING.md is missing section 2 or 3")
+	}
+	reqs := spec[start:end]
+
 	idRow := regexp.MustCompile(`(?m)^\| (REQ-[A-Z]+-\d+) \|`)
 	seen := map[string]bool{}
-	for _, m := range idRow.FindAllStringSubmatch(spec, -1) {
+	for _, m := range idRow.FindAllStringSubmatch(reqs, -1) {
 		if seen[m[1]] {
 			t.Errorf("duplicate requirement ID %s", m[1])
 		}
@@ -43,7 +51,7 @@ func TestSpec_RequirementIDsAreUniqueAndReferencedFilesExist(t *testing.T) {
 
 func TestSpec_DocumentsEveryCLIFlagAndTheBrowserURL(t *testing.T) {
 	spec := readDoc(t, "ENGINEERING.md")
-	for _, f := range clidoc.Spec.Flags {
+	for _, f := range clidoc.GHCustomProperties.Flags {
 		for _, n := range f.Names {
 			dashes := "--"
 			if len(n) == 1 {

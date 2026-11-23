@@ -68,6 +68,6 @@ None beyond the branches listed in section 1.
 
 ## 8. Cleanup debt
 
-- Untracked local files `RemediationStatus_20261118.html` and
-  `remediate-20261118.sh` in the working tree predate this work and were left
-  alone; decide whether to commit, ignore, or delete them.
+- Two untracked local files in the working tree (a `RemediationStatus` HTML
+  report and a `remediate` shell script, both dated 2026-11-18) predate this
+  work and were left alone; decide whether to commit, ignore, or delete them.

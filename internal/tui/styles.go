@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -176,35 +177,54 @@ func init() {
 // ApplyPalette (re)builds every color-dependent style from p. Call once at
 // startup after loading config, before the program runs.
 func ApplyPalette(p Palette) {
-	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(p.Title))
-	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(p.Header))
-	cursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Cursor)).Bold(true)
-	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Selected))
-	dimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Dim))
-	errorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Error)).Bold(true)
-	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Success)).Bold(true)
-	warnStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Warn))
-	helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Help))
-	keyHintStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(p.Cursor))
+	noColor := noColorRequested()
+	col := func(spec string) lipgloss.TerminalColor {
+		if noColor {
+			return lipgloss.NoColor{}
+		}
+		return lipgloss.Color(spec)
+	}
+
+	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(col(p.Title))
+	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(col(p.Header))
+	cursorStyle = lipgloss.NewStyle().Foreground(col(p.Cursor)).Bold(true)
+	selectedStyle = lipgloss.NewStyle().Foreground(col(p.Selected))
+	dimStyle = lipgloss.NewStyle().Foreground(col(p.Dim))
+	errorStyle = lipgloss.NewStyle().Foreground(col(p.Error)).Bold(true)
+	successStyle = lipgloss.NewStyle().Foreground(col(p.Success)).Bold(true)
+	warnStyle = lipgloss.NewStyle().Foreground(col(p.Warn))
+	helpStyle = lipgloss.NewStyle().Foreground(col(p.Help))
+	keyHintStyle = lipgloss.NewStyle().Bold(true).Foreground(col(p.Cursor))
 	footerPanelStyle = lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color(p.Dim)).
+		BorderForeground(col(p.Dim)).
 		Padding(0, 1)
 
-	bg := lipgloss.Color(p.Header)
-	fg := lipgloss.Color("255")
+	// The top bar is a filled band. Without color, reverse video keeps it
+	// distinguishable (NO_COLOR concerns color, not text attributes).
+	bar := func(base lipgloss.Style, fg lipgloss.TerminalColor) lipgloss.Style {
+		if noColor {
+			return base.Reverse(true)
+		}
+		return base.Background(lipgloss.Color(p.Header)).Foreground(fg)
+	}
+	white := lipgloss.TerminalColor(lipgloss.Color("255"))
 	topBarStyles = menubar.Styles{
-		Bar:       lipgloss.NewStyle().Background(bg).Foreground(fg),
-		Item:      lipgloss.NewStyle().Padding(0, 1).Background(bg).Foreground(fg),
-		Shortcut:  lipgloss.NewStyle().Background(bg).Foreground(fg),
+		Bar:       bar(lipgloss.NewStyle(), white),
+		Item:      bar(lipgloss.NewStyle().Padding(0, 1), white),
+		Shortcut:  bar(lipgloss.NewStyle(), white),
 		Hotkey:    lipgloss.NewStyle().Bold(true).Underline(true),
-		Separator: lipgloss.NewStyle().Padding(0, 1).Background(bg).Foreground(fg),
-		Disabled:  lipgloss.NewStyle().Padding(0, 1).Background(bg).Foreground(lipgloss.Color(p.Dim)),
+		Separator: bar(lipgloss.NewStyle().Padding(0, 1), white),
+		Disabled:  bar(lipgloss.NewStyle().Padding(0, 1), col(p.Dim)),
 		// SelectedItem/Dropdown*/ShortcutSelected are left at their zero
 		// value: renderTopBar always keeps the menu inactive (see its
 		// comment), so nothing ever selects an item or opens a dropdown.
 	}
 }
+
+// noColorRequested reports whether the NO_COLOR convention (https://no-color.org)
+// is in effect: the variable is set to a non-empty value.
+func noColorRequested() bool { return os.Getenv("NO_COLOR") != "" }
 
 // renderTopBar renders the persistent top bar: relevant commands — as a
 // bubbletea-menubar Model, used purely for its label-plus-underlined-hotkey

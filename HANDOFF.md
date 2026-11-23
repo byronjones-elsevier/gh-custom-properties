@@ -25,7 +25,6 @@ None beyond the branches listed in section 1.
 | ID | Item | Why | Acceptance | Owner | Blocked by |
 | --- | --- | --- | --- | --- | --- |
 | H-1 | Add a `LICENSE` file | `agents/git.md` requires one (MIT by default) | `LICENSE` present; `README.md` states it | Byron Jones | Decision D-A |
-| H-2 | Verify `NO_COLOR` is honored | `agents/tui.md` requires it; nothing in the code reads it, lipgloss may handle it | Run the TUI with `NO_COLOR=1` in a terminal and confirm no color; add a test if feasible (REQ-TUI-1) | Byron Jones | none |
 | H-3 | Verify terminal restore on SIGINT/SIGTERM | Required by `agents/tui.md`; the project installs no handler | `kill -TERM` the running TUI and confirm the terminal is usable | Byron Jones | none |
 | H-6 | Test the real browser launcher on macOS, Linux, and Windows | Only the stubbed path is tested | `o` opens the page on each platform | Byron Jones | none |
 

@@ -11,6 +11,18 @@ People:
   UI, including merge commits).
 
 ---
+### feat/honor-no-color: honor NO_COLOR
+
+- Branch: `feat/honor-no-color`, base `main`
+- Worked on by: Byron Jones (owner, requester); Claude Sonnet 5.5 (Claude Code, author)
+- Written: 2026-11-23T18:00:00Z
+- What it did: `ApplyPalette` uses no colors when `NO_COLOR` is non-empty; the
+  top bar switches to reverse video so it stays visible.
+- Spec and docs: REQ-TUI-3; README configuration section; HANDOFF H-2 removed
+- Verification: `internal/tui/nocolor_test.go`; `go vet`, `go test ./...`
+  pass. Not exercised in a real terminal.
+
+---
 ### docs/handoff-cleanup: close out the standards work in HANDOFF
 
 - Branch: `docs/handoff-cleanup`, base `main`

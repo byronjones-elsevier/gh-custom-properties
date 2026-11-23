@@ -237,6 +237,10 @@ color_help=240        # footer key hints
 Values are lipgloss color specs: an ANSI 256 color number (`"212"`) or a
 hex code (`"#ff69b4"`).
 
+Set the `NO_COLOR` environment variable to any non-empty value to turn colors
+off (see <https://no-color.org>); bold and underline remain, and the top bar is
+drawn in reverse video.
+
 ## Development
 
 See [ENGINEERING.md](ENGINEERING.md) for the specification, package layout,

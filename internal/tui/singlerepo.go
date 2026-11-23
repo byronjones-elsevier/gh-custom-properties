@@ -24,7 +24,7 @@ type singleListHelpKeys struct {
 
 func (k singleListHelpKeys) ShortHelp() []key.Binding {
 	return []key.Binding{
-		k.keys.Up, k.keys.Add, k.keys.Edit, k.keys.Delete, k.keys.Save,
+		k.keys.Up, k.keys.Add, k.keys.Edit, k.keys.Delete, k.keys.Save, k.keys.Open,
 		keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help"),
 		k.keys.Quit,
 	}
@@ -33,7 +33,7 @@ func (k singleListHelpKeys) ShortHelp() []key.Binding {
 func (k singleListHelpKeys) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.keys.Up, k.keys.Down},
-		{k.keys.Add, k.keys.Edit, k.keys.Delete, k.keys.Save},
+		{k.keys.Add, k.keys.Edit, k.keys.Delete, k.keys.Save, k.keys.Open},
 		{keyBinding("?", "filter"), keyBinding("F5", "refresh"), keyBinding("F1", "help")},
 		{k.keys.Quit},
 	}
@@ -188,6 +188,9 @@ func (m *singleRepoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case appliedMsg:
 		m.screen = screenResult
 		m.backupPath = msg.backupPath
+		m.err = msg.err
+		return m, nil
+	case browserOpenedMsg:
 		m.err = msg.err
 		return m, nil
 	case flashElapsedMsg:
@@ -398,6 +401,11 @@ func (m *singleRepoModel) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pendingDeleteAt = deleteAt
 			m.screen = screenConfirmDelete
 			return m, nil
+		})
+	case key.Matches(msg, m.keys.Open):
+		m.err = nil
+		return m.deferAction("o", func() (tea.Model, tea.Cmd) {
+			return m, openBrowserCmd(m.owner, m.repo)
 		})
 	case key.Matches(msg, m.keys.Save):
 		if len(m.properties) == 0 {

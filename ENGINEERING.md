@@ -443,8 +443,9 @@ rather than waiting out the real 100ms `flashDuration`.
   load or apply in batch mode (shown per repo), browser launch failure (shown on
   the current screen).
 - Terminal restore on SIGINT/SIGTERM relies on Bubble Tea's default signal
-  handling; the project installs no handler of its own and this is not
-  separately tested (see HANDOFF H-3).
+  handling; the project installs no handler of its own. Manually verified on
+  macOS on 2026-11-23 (the terminal was usable after SIGTERM and SIGINT); there
+  is no automated test.
 
 ### Known scope limits (accepted behavior)
 

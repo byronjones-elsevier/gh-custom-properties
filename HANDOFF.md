@@ -5,7 +5,7 @@ specification is [ENGINEERING.md](ENGINEERING.md).
 
 ## 1. Status
 
-- Last updated: 2026-11-23T17:00:00Z
+- Last updated: 2026-11-23T19:00:00Z
 - In flight: none.
 - Verified 2026-11-23: CI is green on `main` (lint, test on ubuntu and macOS,
   govulncheck, build, generated docs) and `make vuln` passes locally. Not
@@ -22,10 +22,7 @@ None beyond the branches listed in section 1.
 
 ## 4. Outstanding work
 
-| ID | Item | Why | Acceptance | Owner | Blocked by |
-| --- | --- | --- | --- | --- | --- |
-| H-3 | Verify terminal restore on SIGINT/SIGTERM | Required by `agents/tui.md`; the project installs no handler | `kill -TERM` the running TUI and confirm the terminal is usable | Byron Jones | none |
-| H-6 | Test the real browser launcher on macOS, Linux, and Windows | Only the stubbed path is tested | `o` opens the page on each platform | Byron Jones | none |
+None. The one open decision is D-B below.
 
 ## 5. Decisions needed
 
@@ -35,6 +32,8 @@ None beyond the branches listed in section 1.
 
 ## 6. Known issues, risks, and unverified areas
 
+- The `o` (open in browser) launcher was verified on macOS on 2026-11-23; the
+  Linux (`xdg-open`) and Windows (`rundll32`) paths are untested.
 - A blank `SystemID`/`CostCode`/`SystemName` unsets the property; this was not
   exercised against live GitHub.
 - If an org marks one of those properties as required, GitHub will reject the

@@ -35,6 +35,7 @@ Words MUST, SHOULD, and MAY are used as in RFC 2119.
 | REQ-EDIT-2 | A backup of prior values MUST be written before any change is applied. |
 | REQ-BROWSER-1 | `o` / `alt+o` on the single-repo property list and the batch table MUST open `https://github.com/<owner>/<repo>/settings/custom-properties` (path-escaped) for the current/selected repo in the default browser, and MUST show an on-screen error if the launch fails. |
 | REQ-TUI-1 | The TUI MUST follow [agents/tui.md](agents/tui.md), except the documented deviations in section 12 (D-1). |
+| REQ-TUI-3 | When `NO_COLOR` is set to a non-empty value, the TUI MUST use no foreground, background, or border colors; text attributes (bold, underline, reverse) MAY remain. |
 | REQ-TUI-2 | `ctrl+q` MUST NOT be bound (XON/XOFF flow control); `ctrl+c` MUST ask for confirmation before quitting. |
 | REQ-CLI-1 | `-h`, `-H`, `-?`, `--help`, `--HELP` MUST show help; a man page and HTML help MUST be generated from `internal/clidoc` and kept in sync by CI. |
 | REQ-SEC-1 | The token MUST NOT be logged or written to backups or config; backup files MUST be mode `0600` in a `0700` directory. |
@@ -473,7 +474,7 @@ Go 1.25 (`go.mod`). Direct dependencies (versions pinned in `go.mod`/`go.sum`):
 | --- | --- |
 | `charmbracelet/bubbletea` v1.3.10 | TUI runtime |
 | `charmbracelet/bubbles` v1.0.0 | list/input/spinner/help/progress widgets |
-| `charmbracelet/lipgloss` v1.1.0 | styling (its color profile is expected to honor `NO_COLOR`; unverified, see HANDOFF H-2) |
+| `charmbracelet/lipgloss` v1.1.0 | styling (`NO_COLOR` is applied explicitly in `ApplyPalette`) |
 | `jejacks0n/bubbletea-menubar` | top bar |
 | `charmbracelet/x/ansi` | ANSI-aware string width/truncation in `internal/tui` |
 | `golang.org/x/term` | raw-mode probe for Alt-key detection |
@@ -498,6 +499,7 @@ generated-docs check; `release.yml` builds release packages.
 | REQ-EDIT-2 | `internal/backup/backup_test.go` |
 | REQ-BROWSER-1 | `internal/browser/browser_test.go`; `internal/tui/browser_test.go` |
 | REQ-TUI-2 | `internal/tui/app_test.go` |
+| REQ-TUI-3 | `internal/tui/nocolor_test.go` |
 | REQ-CLI-1 | `internal/clidoc/spec_test.go`; CI `docs` job |
 | Spec drift | `spec_test.go` in the repo root checks requirement IDs, referenced files, and that `CHANGELOG.md` holds no git-derived facts |
 

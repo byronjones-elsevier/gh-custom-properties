@@ -157,7 +157,7 @@ func (m *singleRepoModel) applyCmd() tea.Cmd {
 	owner, repo := m.owner, m.repo
 	dir := m.backupDir
 	before := append([]ghclient.PropertyValue{}, m.loaded...)
-	after := append([]ghclient.PropertyValue{}, m.properties...)
+	after := withDeletionsCleared(m.loaded, m.properties)
 	api := m.api
 	return func() tea.Msg {
 		path, err := backup.Write(dir, backup.ModeSingle, []backup.RepoSnapshot{
@@ -171,6 +171,24 @@ func (m *singleRepoModel) applyCmd() tea.Cmd {
 		}
 		return appliedMsg{backupPath: path}
 	}
+}
+
+// withDeletionsCleared returns the PATCH payload for the working set: the
+// properties as edited, plus an explicit nil value for every property that
+// was loaded but has since been deleted from the list. GitHub's endpoint only
+// upserts, so omitting a deleted property would leave it set.
+func withDeletionsCleared(loaded, current []ghclient.PropertyValue) []ghclient.PropertyValue {
+	out := append([]ghclient.PropertyValue{}, current...)
+	have := make(map[string]bool, len(current))
+	for _, p := range current {
+		have[p.Name] = true
+	}
+	for _, p := range loaded {
+		if !have[p.Name] {
+			out = append(out, ghclient.PropertyValue{Name: p.Name, Value: nil})
+		}
+	}
+	return out
 }
 
 func (m *singleRepoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

@@ -89,7 +89,9 @@ reference list of the same properties (e.g. "Researcher Products" vs.
 values) — exactly the staleness risk a hardcoded copy would reintroduce.
 `internal/knownprops` only covers what the live schema genuinely can't
 express: format validation for the `string`-typed properties (email, date,
-alphanumeric). Adding a new Elsevier standard `single_select` property
+alphanumeric). `CostCode`, `SystemID`, and `SystemName` also accept a blank,
+which the value editor turns into a `nil` value — i.e. it unsets the
+property on apply rather than writing an empty string. Adding a new Elsevier standard `single_select` property
 needs no code change here — it just needs to exist in the org's schema.
 
 GitHub doesn't guarantee an order for either the property list or a

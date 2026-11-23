@@ -200,9 +200,9 @@ error) until it's fixed:
 
 | Property | Required format |
 |---|---|
-| `CostCode` | alphanumeric |
-| `SystemID` | alphanumeric |
-| `SystemName` | alphanumeric |
+| `CostCode` | alphanumeric, or blank (unsets the property) |
+| `SystemID` | alphanumeric, or blank (unsets the property) |
+| `SystemName` | alphanumeric, or blank (unsets the property) |
 | `owner` | email address |
 | `MigrationReadyDate` | `YYYY-MM-DD` |
 

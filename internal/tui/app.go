@@ -41,7 +41,7 @@ const (
 // text input so it doesn't swallow a literal "q" being typed. Cmd-produced
 // messages route back through App.Update before ever reaching the inner
 // model again (the same mechanism loadedMsg/appliedMsg already rely on),
-// so App can still gate it behind the same confirmation as Ctrl-C/Ctrl-Q.
+// so App can still gate it behind the same confirmation as Ctrl-C.
 type quitRequestedMsg struct{}
 
 func quitRequestedCmd() tea.Msg { return quitRequestedMsg{} }
@@ -72,7 +72,7 @@ func (a *App) Init() tea.Cmd {
 }
 
 func isQuitIntentKey(km tea.KeyMsg) bool {
-	return km.Type == tea.KeyCtrlC || km.String() == "ctrl+q"
+	return km.Type == tea.KeyCtrlC
 }
 
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -114,7 +114,7 @@ func (a *App) handleOverlayKey(km tea.KeyMsg) tea.Cmd {
 	switch a.overlay {
 	case overlayQuitConfirm:
 		switch km.String() {
-		case "y", "enter", "ctrl+c", "ctrl+q":
+		case "y", "enter", "ctrl+c":
 			return tea.Quit
 		default:
 			a.overlay = overlayNone

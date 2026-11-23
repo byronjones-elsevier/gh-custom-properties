@@ -3,8 +3,11 @@ package ghclient
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -113,6 +116,36 @@ func TestGetOrgSchema_Unavailable(t *testing.T) {
 		_, err := c.GetOrgSchema(context.Background(), "acme")
 		if err != ErrSchemaUnavailable {
 			t.Errorf("status %d: err = %v, want ErrSchemaUnavailable", status, err)
+		}
+	}
+}
+
+// TestSetRepoProperties_WorkedExampleFromSpec keeps the worked example in
+// ENGINEERING.md section 5 true: clearing SystemID sends exactly this body.
+func TestSetRepoProperties_WorkedExampleFromSpec(t *testing.T) {
+	var gotPath, gotBody string
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		b, _ := io.ReadAll(r.Body)
+		gotBody = strings.TrimSpace(string(b))
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	if err := c.SetRepoProperties(context.Background(), "acme", "widgets", []PropertyValue{{Name: "SystemID", Value: nil}}); err != nil {
+		t.Fatalf("SetRepoProperties: %v", err)
+	}
+
+	wantBody := `{"properties":[{"property_name":"SystemID","value":null}]}`
+	if gotPath != "/repos/acme/widgets/properties/values" || gotBody != wantBody {
+		t.Errorf("path = %q, body = %s", gotPath, gotBody)
+	}
+	spec, err := os.ReadFile("../../ENGINEERING.md")
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	for _, quoted := range []string{"PATCH /repos/acme/widgets/properties/values", wantBody} {
+		if !strings.Contains(string(spec), quoted) {
+			t.Errorf("ENGINEERING.md no longer quotes %q", quoted)
 		}
 	}
 }

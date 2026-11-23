@@ -46,9 +46,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Scan with the newest patched Go release, not the go.mod minimum:
+      # govulncheck also reports standard-library CVEs in the toolchain that
+      # builds the code, and go.mod's `go` line (a floor) is an old patch
+      # release that keeps tripping them.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version: stable
+          check-latest: true
           cache-dependency-path: go.sum
       - run: make vuln
 

@@ -37,7 +37,8 @@ People:
   Update 2026-11-23T15:30:00Z: after upgrading Go locally, `make vuln` reports
   no vulnerabilities, and `go mod tidy` made `bubbletea-menubar`,
   `golang.org/x/term`, and `charmbracelet/x/ansi` direct dependencies. The CI
-  `vuln` job has not run yet (H-5).
+  `vuln` job failed on its first run with the `go.mod` Go version; it now
+  uses the newest stable Go (Update 2026-11-23T16:00:00Z).
 
 ---
 ### fix/single-delete-clears: single-repo delete now clears on GitHub

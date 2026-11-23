@@ -484,7 +484,7 @@ Go 1.25 (`go.mod`). Direct dependencies (versions pinned in `go.mod`/`go.sum`):
 `make vuln` runs `govulncheck` (pinned by `GOVULNCHECK_VERSION`).
 `make docs/gen` regenerates `docs/*.1` and `docs/*.html` from `internal/clidoc`.
 `make changelog/status` prints, from git in UTC, the merge facts that
-`CHANGELOG.md` must not contain. CI (`.github/workflows/ci.yml`) runs lint
+`CHANGELOG.md` must not contain. The `vuln` job scans with the newest stable Go release (not the `go.mod` floor) so standard-library CVEs are judged against a patched toolchain. CI (`.github/workflows/ci.yml`) runs lint
 (golangci-lint v2.13.2), test (ubuntu, macOS), govulncheck, build, and a
 generated-docs check; `release.yml` builds release packages.
 

@@ -11,6 +11,18 @@ People:
   UI, including merge commits).
 
 ---
+### docs/handoff-verified: record manual verification of H-3 and H-6
+
+- Branch: `docs/handoff-verified`, base `chore/add-mit-license`
+- Worked on by: Byron Jones (owner, ran the manual checks); Claude Sonnet 5.5 (Claude Code, author)
+- Written: 2026-11-23T19:00:00Z
+- What it did: recorded that terminal restore on SIGTERM/SIGINT and the `o`
+  browser launcher were verified by hand on macOS; removed H-3 and H-6; noted
+  that the Linux and Windows launcher paths are untested.
+- Verification: `go test ./...` (living-document drift test). The manual checks
+  themselves were run by the owner.
+
+---
 ### chore/add-mit-license: add the MIT license
 
 - Branch: `chore/add-mit-license`, base `feat/honor-no-color`

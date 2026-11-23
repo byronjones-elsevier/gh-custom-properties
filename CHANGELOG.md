@@ -39,6 +39,8 @@ People:
   `golang.org/x/term`, and `charmbracelet/x/ansi` direct dependencies. The CI
   `vuln` job failed on its first run with the `go.mod` Go version; it now
   uses the newest stable Go (Update 2026-11-23T16:00:00Z).
+  Update 2026-11-23T16:30:00Z: with that Go, govulncheck v1.1.4 panicked on
+  `*ast.KeyValueExpr`; `GOVULNCHECK_VERSION` is now v1.10.0.
 
 ---
 ### fix/single-delete-clears: single-repo delete now clears on GitHub

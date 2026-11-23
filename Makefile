@@ -6,7 +6,7 @@
 BINARY_NAME ?= gh-custom-properties
 GOFLAGS ?=
 ARGS ?=
-GOVULNCHECK_VERSION ?= v1.1.4
+GOVULNCHECK_VERSION ?= v1.10.0
 
 .PHONY: default all deps build install run test test/cover vet fmt fmt/check lint vuln docs/gen changelog/status clean help
 

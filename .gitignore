@@ -6,3 +6,4 @@ repo*.txt
 custom-properties-*.csv
 .DS_Store
 remediate-*.sh
+RemediationStatus_*.html

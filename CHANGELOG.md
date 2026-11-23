@@ -11,6 +11,16 @@ People:
   UI, including merge commits).
 
 ---
+### chore/add-mit-license: add the MIT license
+
+- Branch: `chore/add-mit-license`, base `feat/honor-no-color`
+- Worked on by: Byron Jones (owner, decided the license and holder); Claude Sonnet 5.5 (Claude Code, author)
+- Written: 2026-11-23T18:15:00Z
+- What it did: added `LICENSE` (MIT, copyright holder Byron Scott Jones) and a
+  README License section; closed HANDOFF H-1 and decision D-A.
+- Verification: `go test ./...` (living-document drift test).
+
+---
 ### feat/honor-no-color: honor NO_COLOR
 
 - Branch: `feat/honor-no-color`, base `main`

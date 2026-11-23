@@ -261,3 +261,7 @@ make run ARGS="--file repos.txt"   # build and run with flags
 installed. CI (`.github/workflows/ci.yml`) runs the same checks (plus macOS,
 and a check that `docs/*.1`/`docs/*.html` match what `go generate` produces)
 on every push and pull request to `main`.
+
+## License
+
+[MIT](LICENSE), copyright 2026 Byron Scott Jones.

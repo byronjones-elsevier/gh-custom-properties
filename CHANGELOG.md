@@ -34,6 +34,10 @@ People:
   Update 2026-11-23T15:00:00Z: the owner ran `make vuln`; govulncheck v1.1.4
   works and reported one standard-library finding fixed in a newer Go patch
   release (tracked as H-5). It found nothing in module dependencies.
+  Update 2026-11-23T15:30:00Z: after upgrading Go locally, `make vuln` reports
+  no vulnerabilities, and `go mod tidy` made `bubbletea-menubar`,
+  `golang.org/x/term`, and `charmbracelet/x/ansi` direct dependencies. The CI
+  `vuln` job has not run yet (H-5).
 
 ---
 ### fix/single-delete-clears: single-repo delete now clears on GitHub

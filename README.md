@@ -10,7 +10,7 @@ of the prior values.
 
 ## Demo
 
-<img src="./assets/gh-custom-properties.gif" width="100%" alt="GH-Custom-Properties Demo" />
+<img src="./assets/gh-custom-properties-censored.gif" width="100%" alt="GH-Custom-Properties Demo" />
 
 
 ## Install
